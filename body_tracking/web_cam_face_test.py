@@ -53,7 +53,8 @@ if __name__ == '__main__':
         if len(humans) > 0:
             human = humans[0]
             face = human.get_face_box(w, h)
-            move = 4.0*(face["x"]/w - 0.5)
+            if face != None:
+                move = 2.0*(face["x"]/w - 0.5)
 
 
         logger.debug('postprocess+')
