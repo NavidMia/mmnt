@@ -61,10 +61,6 @@ if __name__ == '__main__':
         image = TfPoseEstimator.draw_humans(image, humans, imgcopy=False)
 
         logger.debug('show+')
-        # cv2.putText(image,
-        #             "FPS: %f" % (1.0 / (time.time() - fps_time)),
-        #             (10, 10),  cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-        #             (0, 255, 0), 2)
         cv2.putText(image,
                     "Move: %f" % (move),
                     (10, 10),  cv2.FONT_HERSHEY_SIMPLEX, 0.5,
