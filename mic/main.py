@@ -20,7 +20,8 @@ CCW = 1
 def main():
     dev = usb.core.find(idVendor=0x2886, idProduct=0x0018)
     # ser = serial.Serial("/dev/tty.usbmodem14201", 9600, timeout=1)
-    ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+    # ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1) # Ubuntu VM
+    ser = serial.Serial("/dev/tty.usbmodem14301", 9600, timeout=1) # OSX
     time.sleep(3)
     
     prevAngle = 0;
@@ -28,7 +29,7 @@ def main():
     if dev:
         mic = Tuning(dev)
         mic.write("NONSTATNOISEONOFF", 1)
-        mic.write("NONSTATNOISEONOFF", 1)
+        mic.write("STATNOISEONOFF", 1)
         while True:
             try:
                 # prev to ref

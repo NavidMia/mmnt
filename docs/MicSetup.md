@@ -3,6 +3,8 @@ Install dependencies with the following command:
 ```bash
 sudo apt-get update
 sudo pip install pyusb
+sudo pip install pyserial
+brew install libusb
 ```
 
 ## Issues
