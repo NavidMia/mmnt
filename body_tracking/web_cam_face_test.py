@@ -49,7 +49,7 @@ if __name__ == '__main__':
         logger.debug('image process+')
         humans = e.inference(image, resize_to_default=(w > 0 and h > 0), upsample_size=args.resize_out_ratio)
 
-        move = -1
+        move = -10
         if len(humans) > 0:
             human = humans[0]
             face = human.get_face_box(w, h)
@@ -61,10 +61,17 @@ if __name__ == '__main__':
         image = TfPoseEstimator.draw_humans(image, humans, imgcopy=False)
 
         logger.debug('show+')
-        cv2.putText(image,
-                    "Move: %f" % (move),
-                    (10, 10),  cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                    (0, 255, 0), 2)
+        if (move > 0):
+            cv2.putText(image,
+                        "Person is right of center",
+                        (10, 10),  cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        (0, 255, 0), 2)
+        else:
+            cv2.putText(image,
+                        "Person is left of center",
+                        (10, 10),  cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        (0, 255, 0), 2)
+
 
         cv2.imshow('tf-pose-estimation result', image)
         fps_time = time.time()
