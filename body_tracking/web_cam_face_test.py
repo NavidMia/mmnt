@@ -17,6 +17,8 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 fps_time = 0
+key_listener_duration = 1
+frame_count = 0
 
 
 if __name__ == '__main__':
@@ -31,6 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default='mobilenet_thin', help='cmu / mobilenet_thin')
     parser.add_argument('--show-process', type=bool, default=False,
                         help='for debug purpose, if enabled, speed for inference is dropped.')
+    parser.add_argument('--d', nargs='?')
     args = parser.parse_args()
 
     logger.debug('initialization %s : %s' % (args.model, get_graph_path(args.model)))
@@ -39,14 +42,21 @@ if __name__ == '__main__':
         e = TfPoseEstimator(get_graph_path(args.model), target_size=(w, h))
     else:
         e = TfPoseEstimator(get_graph_path(args.model), target_size=(432, 368))
-    logger.debug('cam read+')
+    # logger.debug('cam read+')
     cam = cv2.VideoCapture(args.camera)
+
+    if args.d:
+        key_listener_duration = 30
+
     ret_val, image = cam.read()
     logger.info('cam image=%dx%d' % (image.shape[1], image.shape[0]))
 
     while True:
+        print("frame " + str(frame_count))
+        frame_count += 1
+
         ret_val, image = cam.read()
-        logger.debug('image process+')
+        # logger.debug('image process+')
         humans = e.inference(image, resize_to_default=(w > 0 and h > 0), upsample_size=args.resize_out_ratio)
 
         move = -10
@@ -54,10 +64,10 @@ if __name__ == '__main__':
             human = humans[0]
             face = human.get_face_box(w, h)
             if face != None:
+                # print(len(humans), face["x"]) # debug, need to verify face box works (Alex)
                 move = 2.0*(face["x"]/w - 0.5)
 
-
-        logger.debug('postprocess+')
+        # logger.debug('postprocess+')
         image = TfPoseEstimator.draw_humans(image, humans, imgcopy=False)
 
         logger.debug('show+')
@@ -75,8 +85,9 @@ if __name__ == '__main__':
 
         cv2.imshow('tf-pose-estimation result', image)
         fps_time = time.time()
-        if cv2.waitKey(1) == 27:
+        key = cv2.waitKey(key_listener_duration)
+        if key == 27: # escape key should be held
             break
-        logger.debug('finished+')
+        # logger.debug('finished+')
 
     cv2.destroyAllWindows()
