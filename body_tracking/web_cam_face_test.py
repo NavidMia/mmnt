@@ -65,22 +65,27 @@ if __name__ == '__main__':
             face = human.get_face_box(w, h)
             if face != None:
                 # print(len(humans), face["x"]) # debug, need to verify face box works (Alex)
-                move = 2.0*(face["x"]/w - 0.5)
+                move = (2.0*face["x"]/w - 1.0)
 
         # logger.debug('postprocess+')
         image = TfPoseEstimator.draw_humans(image, humans, imgcopy=False)
 
-        logger.debug('show+')
-        if (move > 0):
+        # logger.debug('show+')
+        if (move > 0.3333333):
             cv2.putText(image,
                         "Person is right of center",
                         (10, 10),  cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        (255, 255, 0), 2)
+        elif (move > -0.3333333):
+            cv2.putText(image,
+                        "Person is centered",
+                        (10, 10),  cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                         (0, 255, 0), 2)
-        else:
+        elif (move > -1):
             cv2.putText(image,
                         "Person is left of center",
                         (10, 10),  cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                        (0, 255, 0), 2)
+                        (0, 255, 255), 2)
 
 
         cv2.imshow('tf-pose-estimation result', image)
