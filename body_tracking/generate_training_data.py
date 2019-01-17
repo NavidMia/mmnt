@@ -2,14 +2,15 @@ from tf_pose import infer
 from tf_pose import common
 from tf_pose.common import CocoPart
 from tf_pose.estimator import TfPoseEstimator
+from tf_pose.networks import get_graph_path, model_wh
+import time
 import numpy as np
 import cv2
 import os
 
-# TODO: Make run faster. Took 12 hours to 'finish'. Should only take 2 min
-
 display_images = False
-with open("joint_locations.txt", "w") as output_file:
+start_time = time.time()
+with open("joint_locations_v2.txt", "w") as output_file:
     output_file.write("Data Number, is_standing, " +
             "Nose x, Nose y, Nose score, " +
             "Neck x, Neck y, Neck score, " +
@@ -32,17 +33,19 @@ with open("joint_locations.txt", "w") as output_file:
             "Background x, Background y, Background score\n")
     data_types = ["sitting", "standing"]
     path = './body_tracking/training_images/'
-    index = 0
+    e = TfPoseEstimator(get_graph_path("mobilenet_thin"), target_size=(432, 368))
     for data_type in data_types:
         is_standing = 1*(data_type == "standing")
         files = os.listdir(path + data_type)
+        files.sort()
         for image_name in files:
-            img = common.read_imgfile(path + data_type + "/" + image_name,
-                                    None, None)
-            humans = infer(image=path + data_type + "/" + image_name,
-                            model="mobilenet_thin")
+            t = time.time()
+            index = int(image_name.split(".")[0])
+            img = common.read_imgfile(path + data_type + "/" + image_name, None, None)
+            humans = e.inference(img, resize_to_default=False, upsample_size=4.0)
+
             for id,human in enumerate(humans):
-                output_file.write(str(index) + ", " + str(is_standing) +", ")
+                output_file.write(str(index) + ", " + str(is_standing))
                 for value, body_part_name  in enumerate(CocoPart):
                     if display_images:
                         if value in human.body_parts:
@@ -57,16 +60,17 @@ with open("joint_locations.txt", "w") as output_file:
                     else:
                         if value in human.body_parts:
                             body_part = human.body_parts[value]
-                            output_file.write(str(body_part.x) + ", "
-                                            + str(body_part.y) + ", "
-                                            + str(body_part.score) +", ")
+                            output_file.write(", " + str(body_part.x)
+                                            + ", " + str(body_part.y)
+                                            + ", " + str(body_part.score))
                         else:
-                            output_file.write("-1, -1, 0, ")
+                            output_file.write(", -1, -1, 0")
                 output_file.write("\n")
-                print("done index: " + str(index))
-                index += 1
+            print("done image: " + image_name
+                + " in " + str(time.time() - t) + "s")
             if display_images:
                 img_joints = TfPoseEstimator.draw_humans(img, humans, imgcopy=False)
                 cv2.imshow('Joints',img_joints)
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
+print("Total time: " + str(time.time() - start_time) + "s")
