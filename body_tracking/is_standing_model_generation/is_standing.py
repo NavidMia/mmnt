@@ -8,6 +8,7 @@ import tensorflow.contrib.eager as tfe
 
 tf.enable_eager_execution()
 
+base_folder = "v3/"
 print("TensorFlow version: {}".format(tf.VERSION))
 print("Eager execution: {}".format(tf.executing_eagerly()))
 
@@ -21,20 +22,24 @@ def parse_csv(line):
   features = tf.reshape(parsed_line[2:], shape=(19*3,))
   # Last field is the label
   label = tf.reshape(parsed_line[1], shape=())
-  return features, label
+  # First feild is index
+  index = tf.reshape(parsed_line[0], shape=())
+  return features, label, index
 
 print("setting up train_dataset")
-train_dataset = tf.data.TextLineDataset("joint_training_comma_removed.txt")
+train_dataset = tf.data.TextLineDataset(base_folder
+                                    + "joint_locations_training.txt")
 train_dataset = train_dataset.skip(1)             # skip the first header row
 train_dataset = train_dataset.map(parse_csv)      # parse each row
-train_dataset = train_dataset.shuffle(buffer_size=1000)  # randomize
+# train_dataset = train_dataset.shuffle(buffer_size=1000)  # randomize
 train_dataset = train_dataset.batch(32)
 
 print("view single example")
 # View a single example entry from a batch
-features, label = iter(train_dataset).next()
+features, label, index = iter(train_dataset).next()
 print("example features:", features[0])
 print("example label:", label[0])
+print("example index:", index[0])
 
 model = tf.keras.Sequential([
   tf.keras.layers.Dense(100, activation="relu", input_shape=(19*3,)),  # input shape required
@@ -69,7 +74,7 @@ for epoch in range(num_epochs):
   epoch_accuracy = tfe.metrics.Accuracy()
 
   # Training loop - using batches of 32
-  for x, y in train_dataset:
+  for x, y, z in train_dataset:
     # Optimize the model
     grads = grad(model, x, y)
     optimizer.apply_gradients(zip(grads, model.variables),
@@ -102,7 +107,8 @@ axes[1].plot(train_accuracy_results)
 
 plt.show()
 
-test_dataset = tf.data.TextLineDataset("joint_testing_comma_removed.txt")
+test_dataset = tf.data.TextLineDataset(base_folder +
+                            "joint_locations_testing.txt")
 test_dataset = test_dataset.skip(1)             # skip header row
 test_dataset = test_dataset.map(parse_csv)      # parse each row with the funcition created earlier
 # test_dataset = test_dataset.shuffle(1000)       # randomize
@@ -110,10 +116,11 @@ test_dataset = test_dataset.batch(32)           # use the same batch size as the
 test_accuracy = tfe.metrics.Accuracy()
 
 print("tests")
-for (x, y) in test_dataset:
+for (x, y, z) in test_dataset:
   prediction = tf.argmax(model(x), axis=1, output_type=tf.int32)
   print(prediction)
   print(y)
+  print(z)
   test_accuracy(prediction, y)
 
 print("Test set accuracy: {:.3%}".format(test_accuracy.result()))

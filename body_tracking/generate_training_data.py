@@ -10,7 +10,10 @@ import os
 
 display_images = False
 start_time = time.time()
-with open("joint_locations_v2.txt", "w") as output_file:
+data_types = ["sitting", "standing"]
+# data_types = ["doubles"]
+path = './body_tracking/training_images/'
+with open("joint_locations_v3.txt", "w") as output_file:
     output_file.write("Data Number, is_standing, " +
             "Nose x, Nose y, Nose score, " +
             "Neck x, Neck y, Neck score, " +
@@ -31,8 +34,6 @@ with open("joint_locations_v2.txt", "w") as output_file:
             "REar x, REar y, REar score, " +
             "LEar x, LEar y, LEar score, " +
             "Background x, Background y, Background score\n")
-    data_types = ["sitting", "standing"]
-    path = './body_tracking/training_images/'
     e = TfPoseEstimator(get_graph_path("mobilenet_thin"), target_size=(432, 368))
     for data_type in data_types:
         is_standing = 1*(data_type == "standing")
@@ -45,6 +46,8 @@ with open("joint_locations_v2.txt", "w") as output_file:
             humans = e.inference(img, resize_to_default=False, upsample_size=4.0)
 
             for id,human in enumerate(humans):
+                if id > 0:
+                    print("multiple humans in image: " + image_name)
                 output_file.write(str(index) + ", " + str(is_standing))
                 for value, body_part_name  in enumerate(CocoPart):
                     if display_images:
@@ -72,5 +75,5 @@ with open("joint_locations_v2.txt", "w") as output_file:
                 img_joints = TfPoseEstimator.draw_humans(img, humans, imgcopy=False)
                 cv2.imshow('Joints',img_joints)
                 cv2.waitKey(0)
-                cv2.destroyAllWindows()
+                print("done window")
 print("Total time: " + str(time.time() - start_time) + "s")
