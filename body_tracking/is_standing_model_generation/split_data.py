@@ -2,7 +2,7 @@
 import random
 
 num_data = 100
-num_testing = 20
+num_testing = 0
 
 first_half = list(range(1, int(num_data/2) + 1))
 random.shuffle(first_half)

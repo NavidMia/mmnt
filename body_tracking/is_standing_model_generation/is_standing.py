@@ -110,6 +110,14 @@ if __name__ == "__main__":
 
     plt.show()
 
+    # serialize model to JSON
+    model_json = model.to_json()
+    with open("model.json", "w") as json_file:
+        json_file.write(model_json)
+    # serialize weights to HDF5
+    model.save_weights("model.h5")
+    print("Saved model to disk")
+
     test_dataset = tf.data.TextLineDataset(base_folder +
                                 "joint_locations_testing.txt")
     test_dataset = test_dataset.skip(1)             # skip header row
