@@ -47,7 +47,7 @@ if __name__ == "__main__":
     model = tf.keras.Sequential([
       tf.keras.layers.Dense(100, activation="relu", input_shape=(19*3,)),  # input shape required
       tf.keras.layers.Dense(50, activation="relu"),
-      tf.keras.layers.Dense(3)
+      tf.keras.layers.Dense(2)
     ])
 
     def loss(model, x, y):
