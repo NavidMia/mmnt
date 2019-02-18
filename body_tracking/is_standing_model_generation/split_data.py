@@ -1,29 +1,30 @@
 # This file splits data into training and testing data set
 import random
 
-num_data = 100
-num_testing = 0
+def split_data(base_name, percent_test):
+    if base_name[-4:] == ".txt":
+        base_name = base_name[:-4]
+    if percent_test > 1:
+        percent_test = 1
+    elif percent_test < 0:
+        percent_test = 0
 
-first_half = list(range(1, int(num_data/2) + 1))
-random.shuffle(first_half)
-# training = first_half[:int(num_training/2)]
-test = first_half[:int(num_testing/2)]
+    num_data = sum(1 for line in open(base_name +".txt")) - 1
+    num_testing = int(round(num_data*percent_test))
 
-second_half = list(range(int(num_data/2) + 1, num_data + 1))
-random.shuffle(second_half)
-# training += second_half[:int(num_training/2)]
-test += second_half[:int(num_testing/2)]
-
-with open("v3/joint_locations_v3.txt", "r") as all_data, open(
-         "v3/joint_locations_training.txt", "w") as training_file, open(
-         "v3/joint_locations_testing.txt", "w") as testing_file:
-    for i, line in enumerate(all_data):
-        if i == 0:
-            training_file.write(line)
-            testing_file.write(line)
-            continue
-        index = int(line.split(",")[0])
-        if index in test:
-            testing_file.write(line)
-        else:
-            training_file.write(line)
+    shuffle_index = list(range(1, num_data))
+    random.shuffle(shuffle_index)
+    test_idx = shuffle_index[:num_testing]
+    with open(base_name +".txt", "r") as all_data, open(
+             base_name + "_training.txt", "w") as training_file, open(
+             base_name + "_testing.txt", "w") as testing_file:
+        for i, line in enumerate(all_data):
+            if i == 0:
+                training_file.write(line)
+                testing_file.write(line)
+                continue
+            index = int(line.split(",")[0])
+            if index in test_idx:
+                testing_file.write(line)
+            else:
+                training_file.write(line)

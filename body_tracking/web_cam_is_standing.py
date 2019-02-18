@@ -29,12 +29,14 @@ frame_count = 0
 
 if __name__ == '__main__':
     # Load is_standing network
-    json_file = open('is_standing_model_generation/model.json', 'r')
+    path = "is_standing_model_generation/c1200_no_bad/"
+    name = "c1200_no_bad"
+    json_file = open(path + name + ".json", 'r')
     loaded_model_json = json_file.read()
     json_file.close()
     loaded_model = tf.keras.models.model_from_json(loaded_model_json)
     # load weights into new model
-    loaded_model.load_weights("is_standing_model_generation/model.h5")
+    loaded_model.load_weights(path + name + ".h5")
     print("Loaded model from disk")
 
     model = 'mobilenet_thin'

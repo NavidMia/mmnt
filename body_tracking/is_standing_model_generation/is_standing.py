@@ -23,18 +23,21 @@ def parse_csv(line):
 if __name__ == "__main__":
     tf.enable_eager_execution()
 
-    base_folder = "v3/"
+    model_name = "c1200_no_bad"
+    TEST = True
+    base_folder = "c1200_no_bad/"
+    base_name = "joint_locations_is_standing_v5"
+    import split_data
+    split_data.split_data(base_folder + base_name, 0.2)
     print("TensorFlow version: {}".format(tf.VERSION))
     print("Eager execution: {}".format(tf.executing_eagerly()))
 
-
-
     print("setting up train_dataset")
-    train_dataset = tf.data.TextLineDataset(base_folder
-                                        + "joint_locations_training.txt")
+    train_dataset = tf.data.TextLineDataset(base_folder + base_name
+                                            + "_training.txt")
     train_dataset = train_dataset.skip(1)             # skip the first header row
     train_dataset = train_dataset.map(parse_csv)      # parse each row
-    # train_dataset = train_dataset.shuffle(buffer_size=1000)  # randomize
+    train_dataset = train_dataset.shuffle(buffer_size=1000)  # randomize
     train_dataset = train_dataset.batch(32)
 
     print("view single example")
@@ -45,8 +48,10 @@ if __name__ == "__main__":
     print("example index:", index[0])
 
     model = tf.keras.Sequential([
-      tf.keras.layers.Dense(100, activation="relu", input_shape=(19*3,)),  # input shape required
-      tf.keras.layers.Dense(50, activation="relu"),
+      tf.keras.layers.Dense(30, activation="relu", input_shape=(19*3,)),  # input shape required
+      # tf.keras.layers.Dense(50, activation="relu"),
+      # tf.keras.layers.Dense(25, activation="relu"),
+      # tf.keras.layers.Dense(10, activation="relu"),
       tf.keras.layers.Dense(2)
     ])
 
@@ -110,36 +115,33 @@ if __name__ == "__main__":
 
     plt.show()
 
-    # serialize model to JSON
-    model_json = model.to_json()
-    with open("model.json", "w") as json_file:
-        json_file.write(model_json)
-    # serialize weights to HDF5
-    model.save_weights("model.h5")
-    print("Saved model to disk")
+    if TEST:
+        test_dataset = tf.data.TextLineDataset(base_folder + base_name
+                                            + "_testing.txt")
+        test_dataset = test_dataset.skip(1)             # skip header row
+        test_dataset = test_dataset.map(parse_csv)      # parse each row with the funcition created earlier
+        # test_dataset = test_dataset.shuffle(1000)       # randomize
+        test_dataset = test_dataset.batch(32)           # use the same batch size as the training set
+        test_accuracy = tfe.metrics.Accuracy()
 
-    test_dataset = tf.data.TextLineDataset(base_folder +
-                                "joint_locations_testing.txt")
-    test_dataset = test_dataset.skip(1)             # skip header row
-    test_dataset = test_dataset.map(parse_csv)      # parse each row with the funcition created earlier
-    # test_dataset = test_dataset.shuffle(1000)       # randomize
-    test_dataset = test_dataset.batch(32)           # use the same batch size as the training set
-    test_accuracy = tfe.metrics.Accuracy()
+        print("tests")
+        for (x, y, z) in test_dataset:
+          # print(model(x))
+          prediction = tf.argmax(model(x), axis=1, output_type=tf.int32)
+          # print("Prediction, ground truth, label, is_eq")
+          # print(prediction)
+          # print(y)
+          # print(z)
+          # print(tf.equal(prediction, y))
+          # print()
+          test_accuracy(y, prediction)
 
-    print("tests")
-    for (x, y, z) in test_dataset:
-      prediction = tf.argmax(model(x), axis=1, output_type=tf.int32)
-      print(prediction)
-      print(y)
-      print(z)
-      test_accuracy(prediction, y)
-
-    print("Test set accuracy: {:.3%}".format(test_accuracy.result()))
+        print("Test set accuracy: {:.3%}".format(test_accuracy.result()))
 
     # serialize model to JSON
     model_json = model.to_json()
-    with open("model.json", "w") as json_file:
+    with open(base_folder + model_name + ".json", "w") as json_file:
         json_file.write(model_json)
     # serialize weights to HDF5
-    model.save_weights("model.h5")
+    model.save_weights(base_folder + model_name + ".h5")
     print("Saved model to disk")
