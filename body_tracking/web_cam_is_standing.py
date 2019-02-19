@@ -9,7 +9,7 @@ from tf_pose.estimator import TfPoseEstimator
 from tf_pose.networks import get_graph_path, model_wh
 
 import tensorflow as tf
-from is_standing_model_generation.is_standing import parse_csv
+from is_standing_model_generation.create_model import parse_csv
 
 from tf_pose.common import CocoPart
 
@@ -49,6 +49,8 @@ if __name__ == '__main__':
         e = TfPoseEstimator(get_graph_path(model), target_size=(432, 368))
     camera_num = 0
     cam = cv2.VideoCapture(camera_num)
+    # This sets the buffer size to 1
+    cam.set(38, 1) # CV_CAP_PROP_BUFFERSIZE = 38
 
     ret_val, image = cam.read()
     logger.info('cam image=%dx%d' % (image.shape[1], image.shape[0]))
@@ -57,9 +59,7 @@ if __name__ == '__main__':
     while True:
         print("frame " + str(frame_count))
         frame_count += 1
-
         ret_val, image = cam.read()
-        # logger.debug('image process+')
         humans = e.inference(image, resize_to_default=(w > 0 and h > 0),
                             upsample_size=resize_out_ratio)
         image = TfPoseEstimator.draw_humans(image, humans, imgcopy=False)
@@ -90,12 +90,12 @@ if __name__ == '__main__':
             prediction = loaded_model.predict(features, steps=1)[0]
             if(prediction[0] > prediction[1]):
                 cv2.putText(image,
-                            "Sitting",
+                            "Standing",
                             (50, 50),  cv2.FONT_HERSHEY_SIMPLEX, 2,
                             (0, 255, 0), 2)
             else:
                 cv2.putText(image,
-                            "Standing",
+                            "Sitting",
                             (50, 50),  cv2.FONT_HERSHEY_SIMPLEX, 2,
                             (0, 0, 255), 2)
             # prediction = tf.argmax(loaded_model(features), axis=1, output_type=tf.int32)
