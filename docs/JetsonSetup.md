@@ -30,3 +30,8 @@
     Follow the install instructions on the readme. The package install flow seemed to work better than the regular install flow.
 
 6. Clone the [MMNT repo](https://github.com/alexanderyshi/mmnt)
+
+
+## Other Useful Links
+* https://devtalk.nvidia.com/default/topic/1025356/how-to-capture-and-display-camera-video-with-python-on-jetson-tx2/
+* https://gist.github.com/jkjung-avt/86b60a7723b97da19f7bfa3cb7d2690e
