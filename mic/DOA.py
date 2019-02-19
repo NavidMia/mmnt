@@ -10,7 +10,7 @@ if dev:
     mic.write("NONSTATNOISEONOFF", 1)
     while True:
         try:
-            print mic.direction
+            print(mic.direction)
             time.sleep(1)
         except KeyboardInterrupt:
             break
