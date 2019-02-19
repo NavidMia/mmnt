@@ -26,16 +26,21 @@ void setup() {
 }
 
 void step(boolean dir,int steps){
-  digitalWrite(dirPin1,dir);
-  digitalWrite(dirPin2,dir);
+  if (dir == 1) {
+    digitalWrite(dirPin1, true);
+    digitalWrite(dirPin2, true); 
+  } else {
+    digitalWrite(dirPin1, false);
+    digitalWrite(dirPin2, false); 
+  }
   delay(50);
   for(int i=0;i<steps;i++){
     digitalWrite(stepperPin1, HIGH);
     digitalWrite(stepperPin2, HIGH);
-    delayMicroseconds(1000);
+    delayMicroseconds(300);
     digitalWrite(stepperPin1, LOW);
     digitalWrite(stepperPin2, LOW);
-    delayMicroseconds(1000);
+    delayMicroseconds(300);
   }
 }
 
@@ -59,9 +64,17 @@ void step_individual(int id, int dir, int steps) {
   delay(50);
   for(int i=0;i<steps;i++){
     digitalWrite(stepperPin, HIGH);
-    delayMicroseconds(300);
+    if (id == 0) {
+      delayMicroseconds(1000); 
+    } else {
+      delayMicroseconds(2000);
+    }
     digitalWrite(stepperPin, LOW);
-    delayMicroseconds(300);
+    if (id == 0) {
+      delayMicroseconds(1000); 
+    } else {
+      delayMicroseconds(2000);
+    }
   }
 }
 
@@ -79,6 +92,7 @@ void handleMotorSetCommand() {
     }
   }
   step_individual(id, dir, steps);
+//  step(dir, steps);
 }
 
 void loop(){
