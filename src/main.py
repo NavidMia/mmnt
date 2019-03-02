@@ -39,13 +39,12 @@ def main():
             targetAngle = mic.direction
             ser.flushInput()
             ser.flushOutput()
-            if slaveCam == BOT_CAM:
-                mc.botMotor(targetAngle)
-            else:
-                mc.topMotor(targetAngle)
+            mc.runMotor(slaveCam, targetAngle)
 
         except KeyboardInterrupt:
             print "Keyboard interrupt! Terminating."
+            mc.stopMotors()
+            sleep(2)
             break
 
 if __name__ == "__main__":

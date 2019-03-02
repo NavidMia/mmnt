@@ -52,13 +52,21 @@ class MotorControl(object):
     def build_serial_multi_motor_stop_cmd(self):
         return MULTI_MOTOR_STOP_CMD
 
-    def topMotor(self, angle):
+    def runTopMotor(self, angle):
         cmd = self.build_serial_motor_cmd(TOP_MOTOR_ID, angle)
         self.ser.write(cmd)
 
-    def botMotor(self, angle):
+    def runBotMotor(self, angle):
         cmd = self.build_serial_motor_cmd(BOT_MOTOR_ID, angle)
         self.ser.write(cmd)
+
+    def runMotor(self, motor_id, angle):
+        if motor_id == TOP_MOTOR_ID:
+            self.runTopMotor(angle)
+        elif motor_id == BOT_MOTOR_ID:
+            self.runBotMotor(angle)
+        else:
+            print("Could not run motor: invalid motor ID")
 
     def runMotors(self, topAngle, botAngle):
         cmd = self.build_serial_multi_motor_cmd(topAngle, botAngle)
