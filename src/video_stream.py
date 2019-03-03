@@ -1,15 +1,18 @@
 import cv2 as cv
 import numpy as np
+from threading import Thread
 
 class VideoStream:
-    DEFAULT_WIDTH = 432
-    DEFAULT_HEIGHT = 368
+    DEFAULT_WIDTH = 640
+    DEFAULT_HEIGHT = 480
     
     def __init__(self, camera=-1, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
         if camera == -1:
             self.stream = self.open_onboard_cam(width, height)
         else:
             self.stream = cv.VideoCapture(camera)
+            self.stream.set(cv.CAP_PROP_FRAME_WIDTH, width);
+            self.stream.set(cv.CAP_PROP_FRAME_HEIGHT, height);
         self.stopped = False
         (self.grabbed, self.frame) = self.stream.read()
     
