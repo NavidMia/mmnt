@@ -17,6 +17,8 @@ from tuning import Tuning
 from motor_control import MotorControl
 from video_stream import VideoStream
 
+MMNT_SETUP_PRESENT = True
+
 TOP_CAM_ID = "0"
 BOT_CAM_ID = "1"
 TF_MODEL = "mobilenet_thin" # alternative option: "cmu"
@@ -27,17 +29,21 @@ degreePerPixel = float(FOV) / float(VideoStream.DEFAULT_WIDTH)
 
 def main():
     print("initializing")
-    mc = MotorControl()
-    print("initialized motor control")
-    dev = usb.core.find(idVendor=0x2886, idProduct=0x0018)
-    if not dev:
-        sys.exit("Could not find ReSpeaker Mic Array through USB")
-    mic = Tuning(dev)
-    mic.write("NONSTATNOISEONOFF", 1)
-    mic.write("STATNOISEONOFF", 1)
-    print("initialized microphone")
+    if MMNT_SETUP_PRESENT:
+        mc = MotorControl()
+        print("initialized motor control")
+        dev = usb.core.find(idVendor=0x2886, idProduct=0x0018)
+        if not dev:
+            sys.exit("Could not find ReSpeaker Mic Array through USB")
+        mic = Tuning(dev)
+        mic.write("NONSTATNOISEONOFF", 1)
+        mic.write("STATNOISEONOFF", 1)
+        print("initialized microphone")
 
-    face_cascade = cv.CascadeClassifier('/home/nvidia/mmnt/opencv/data/haarcascades_cuda/haarcascade_frontalface_default.xml')
+    if MMNT_SETUP_PRESENT:
+        face_cascade = cv.CascadeClassifier('/home/nvidia/mmnt/opencv/data/haarcascades_cuda/haarcascade_frontalface_default.xml')
+    else:
+        face_cascade = cv.CascadeClassifier('/home/nvidia/sd/opencv/data/haarcascades_cuda/haarcascade_frontalface_default.xml')
     # tfPose = TfPoseEstimator(get_graph_path(TF_MODEL), target_size=(VideoStream.DEFAULT_WIDTH, VideoStream.DEFAULT_HEIGHT))
 
     topCamStream = VideoStream()
@@ -81,30 +87,35 @@ def main():
 
             # SLAVE
             slaveFrame = slaveStream.read()
-            if abs(mic.direction - slaveTargetAngle) > ANGLE_THRESHOLD:
-                slaveTargetAngle = mic.direction
-                updateSlaveAngle = True
-            # humans = e.inference(image, resize_to_default=True, upsample_size=4.0)
+            if MMNT_SETUP_PRESENT:
+                if abs(mic.direction - slaveTargetAngle) > ANGLE_THRESHOLD:
+                    slaveTargetAngle = mic.direction
+                    updateSlaveAngle = True
+                # humans = e.inference(image, resize_to_default=True, upsample_size=4.0)
 
             # Send Serial Commands
-            if updateSlaveAngle and updateMasterAngle:
-                print("Slave Angle:", slaveTargetAngle)
-                print("Master Angle:", masterTargetAngle)
-                updateSlaveAngle = False
-                updateMasterAngle = False
-                if slaveCamID == BOT_CAM_ID:
-                    mc.runMotors(masterTargetAngle, slaveTargetAngle)
-                else:
-                    mc.runMotors(slaveTargetAngle, masterTargetAngle)
-            elif updateSlaveAngle:
-                mc.runMotor(slaveCamID, slaveTargetAngle)
-                print("Slave Angle:", slaveTargetAngle)
-                updateSlaveAngle = False
-            elif updateMasterAngle:
-                mc.runMotor(masterCamID, masterTargetAngle)
-                print("Master Angle:", masterTargetAngle)
-                updateMasterAngle = False
-            sleep(2)
+                if updateSlaveAngle and updateMasterAngle:
+                    print("Slave Angle:", slaveTargetAngle)
+                    print("Master Angle:", masterTargetAngle)
+                    updateSlaveAngle = False
+                    updateMasterAngle = False
+                    if slaveCamID == BOT_CAM_ID:
+                        mc.runMotors(masterTargetAngle, slaveTargetAngle)
+                    else:
+                        mc.runMotors(slaveTargetAngle, masterTargetAngle)
+                elif updateSlaveAngle:
+                    mc.runMotor(slaveCamID, slaveTargetAngle)
+                    print("Slave Angle:", slaveTargetAngle)
+                    updateSlaveAngle = False
+                elif updateMasterAngle:
+                    mc.runMotor(masterCamID, masterTargetAngle)
+                    print("Master Angle:", masterTargetAngle)
+                    updateMasterAngle = False
+
+            # 1) Sleep if not showing frames
+            time.sleep(2)
+
+            # OR 2) Display debug frames
             # cv.imshow('Master Camera', masterFrame)
             # cv.imshow('Slave Camera', slaveFrame)
             # if cv.waitKey(1) == 27:
@@ -112,7 +123,8 @@ def main():
 
         except KeyboardInterrupt:
             print("Keyboard interrupt! Terminating.")
-            mc.stopMotors()
+            if MMNT_SETUP_PRESENT:
+                mc.stopMotors()
             slaveStream.stop()
             masterStream.stop()
             time.sleep(2)
