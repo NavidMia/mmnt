@@ -7,11 +7,12 @@ import sys
 import usb.core
 import usb.util
 import serial
-from threading import Thread
 
+import cv2 as cv
 import numpy as np
-from tf_pose.estimator import TfPoseEstimator
-from tf_pose.networks import get_graph_path, model_wh
+
+# from tf_pose.estimator import TfPoseEstimator
+# from tf_pose.networks import get_graph_path, model_wh
 from tuning import Tuning
 from motor_control import MotorControl
 from video_stream import VideoStream
@@ -25,27 +26,21 @@ FOV = 60
 degreePerPixel = float(FOV) / float(VideoStream.DEFAULT_WIDTH)
 
 def main():
-    ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
-    time.sleep(3)
-    
+    print("initializing")
     mc = MotorControl()
-    # mc.runMotors(90, 270)
-    # sleep(2)
-    # mc.runMotors(270, 90)
-    # sleep(2)
-
+    print("initialized motor control")
     dev = usb.core.find(idVendor=0x2886, idProduct=0x0018)
     if not dev:
         sys.exit("Could not find ReSpeaker Mic Array through USB")
-
     mic = Tuning(dev)
     mic.write("NONSTATNOISEONOFF", 1)
     mic.write("STATNOISEONOFF", 1)
-    
-    face_cascade = cv.CascadeClassifier('haarcascade_frontalface_default.xml')
-    tfPose = TfPoseEstimator(get_graph_path(TF_MODEL), target_size=(VideoStream.DEFAULT_WIDTH, VideoStream.DEFAULT_HEIGHT))
+    print("initialized microphone")
 
-    topCamStream = VideoStream(0)
+    face_cascade = cv.CascadeClassifier('haarcascade_frontalface_default.xml')
+    # tfPose = TfPoseEstimator(get_graph_path(TF_MODEL), target_size=(VideoStream.DEFAULT_WIDTH, VideoStream.DEFAULT_HEIGHT))
+
+    topCamStream = VideoStream()
     botCamStream = VideoStream(1)
 
     topCamStream.start()
@@ -61,10 +56,13 @@ def main():
 
     updateSlaveAngle = False
     updateMasterAngle = False
+    print("initialized video streams")
+
     while True:
         try:
             # MASTER
-            gray = cv.cvtColor(masterStream.read(), cv.COLOR_BGR2GRAY)
+            masterFrame = masterStream.read()
+            gray = cv.cvtColor(masterFrame, cv.COLOR_BGR2GRAY)
             faces = face_cascade.detectMultiScale(gray, 1.3, 5)
             # Focus on first face for now
             if faces:
@@ -82,28 +80,45 @@ def main():
                     updateMasterAngle = True
 
             # SLAVE
-            if abs(mic.direction - slaveTargetAngle) > ANGLE_THRESHOLD
+            slaveFrame = slaveStream.read()
+            if abs(mic.direction - slaveTargetAngle) > ANGLE_THRESHOLD:
                 slaveTargetAngle = mic.direction
                 updateSlaveAngle = True
-            # slaveImage = slaveStream.read()
             # humans = e.inference(image, resize_to_default=True, upsample_size=4.0)
 
             # Send Serial Commands
-            if updateSlaveAngle:
-                mc.runMotor(slaveCamID, slaveTargetAngle)
+            if updateSlaveAngle and updateMasterAngle:
+                print("Slave Angle:", slaveTargetAngle)
+                print("Master Angle:", masterTargetAngle)
                 updateSlaveAngle = False
-            if updateMasterAngle:
+                updateMasterAngle = False
+                if slaveCamID == BOT_CAM_ID:
+                    mc.runMotors(masterTargetAngle, slaveTargetAngle)
+                else:
+                    mc.runMotors(slaveTargetAngle, masterTargetAngle)
+            elif updateSlaveAngle:
+                mc.runMotor(slaveCamID, slaveTargetAngle)
+                print("Slave Angle:", slaveTargetAngle)
+                updateSlaveAngle = False
+            elif updateMasterAngle:
                 mc.runMotor(masterCamID, masterTargetAngle)
+                print("Master Angle:", masterTargetAngle)
                 updateMasterAngle = False
             sleep(2)
+            # cv.imshow('Master Camera', masterFrame)
+            # cv.imshow('Slave Camera', slaveFrame)
+            # if cv.waitKey(1) == 27:
+            #     pass
 
         except KeyboardInterrupt:
-            print "Keyboard interrupt! Terminating."
+            print("Keyboard interrupt! Terminating.")
             mc.stopMotors()
             slaveStream.stop()
             masterStream.stop()
-            sleep(2)
+            time.sleep(2)
             break
+
+    cv.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
