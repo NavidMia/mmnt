@@ -37,7 +37,7 @@ def main():
     mic.write("STATNOISEONOFF", 1)
     print("initialized microphone")
 
-    face_cascade = cv.CascadeClassifier('haarcascade_frontalface_default.xml')
+    face_cascade = cv.CascadeClassifier('/home/nvidia/mmnt/opencv/data/haarcascades_cuda/haarcascade_frontalface_default.xml')
     # tfPose = TfPoseEstimator(get_graph_path(TF_MODEL), target_size=(VideoStream.DEFAULT_WIDTH, VideoStream.DEFAULT_HEIGHT))
 
     topCamStream = VideoStream()
