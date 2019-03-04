@@ -10,7 +10,7 @@ from tf_pose.networks import get_graph_path, model_wh
 
 import tensorflow as tf
 
-from tf_pose.common import CocoPart
+import nn_func as nn
 
 
 logger = logging.getLogger('TfPoseEstimator-WebCam')
@@ -28,15 +28,8 @@ frame_count = 0
 
 if __name__ == '__main__':
     # Load is_standing network
-    path = "is_standing_model_generation/c1200_no_bad/"
-    name = "c1200_no_bad_v2"
-    json_file = open(path + name + ".json", 'r')
-    loaded_model_json = json_file.read()
-    json_file.close()
-    loaded_model = tf.keras.models.model_from_json(loaded_model_json)
-    # load weights into new model
-    loaded_model.load_weights(path + name + ".h5")
-    print("Loaded model from disk")
+    nn_model = nn.get_model(path = "is_standing_model_generation/c1200_no_bad/",
+                     name = "c1200_no_bad_v2")
 
     model = 'mobilenet_thin'
     logger.debug('initialization %s : %s' % (model, get_graph_path(model)))
@@ -74,22 +67,7 @@ if __name__ == '__main__':
                         (255, 255, 0), 2)
         else: # 1 human
             human = humans[0]
-            joint_data = []
-            # Dont add Background, RElbow, RWrist, LElbow, LWrist
-            body_parts_not_to_add = [18,3,4,6,7]
-            for value, body_part_name  in enumerate(CocoPart):
-                if value in human.body_parts and value not in body_parts_not_to_add:
-                    body_part = human.body_parts[value]
-                    joint_data.append(body_part.x)
-                    joint_data.append(body_part.y)
-                    joint_data.append(body_part.score)
-                elif value not in body_parts_not_to_add:
-                    joint_data.append(-1)
-                    joint_data.append(-1)
-                    joint_data.append(0)
-            features = tf.reshape(joint_data, shape=(1, 14*3))
-            prediction = loaded_model.predict(features, steps=1)[0]
-            if(prediction[0] > prediction[1]):
+            if(nn.is_standing(nn_model, human)):
                 cv2.putText(image,
                             "Standing",
                             (50, 50),  cv2.FONT_HERSHEY_SIMPLEX, 2,
@@ -99,7 +77,6 @@ if __name__ == '__main__':
                             "Sitting",
                             (50, 50),  cv2.FONT_HERSHEY_SIMPLEX, 2,
                             (0, 0, 255), 2)
-            # prediction = tf.argmax(loaded_model(features), axis=1, output_type=tf.int32)
         cv2.imshow('tf-pose-estimation result', image)
         fps_time = time.time()
         key = cv2.waitKey(key_listener_duration)
