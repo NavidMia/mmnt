@@ -20,9 +20,19 @@ def get_model(path, name):
 
 # Given a model and a human, will return if it is standing
 def is_standing(model, human):
+    leg_parts = [CocoPart.RKnee.value,
+                CocoPart.RAnkle.value,
+                CocoPart.LKnee.value,
+                CocoPart.LAnkle.value]
+    # If no legs return sitting
+    if not any(x in leg_parts for x in human.body_parts):
+        return False
+    body_parts_not_to_add = [CocoPart.Background.value,
+                             CocoPart.RElbow.value,
+                             CocoPart.RWrist.value,
+                             CocoPart.LElbow.value,
+                             CocoPart.LWrist.value]
     joint_data = []
-    # Dont add Background, RElbow, RWrist, LElbow, LWrist
-    body_parts_not_to_add = [18,3,4,6,7]
     for value, body_part_name  in enumerate(CocoPart):
         if value in human.body_parts and value not in body_parts_not_to_add:
             body_part = human.body_parts[value]
