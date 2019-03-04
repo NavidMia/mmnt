@@ -17,7 +17,7 @@ display_images = True
 start_time = time.time()
 # Is standing
 # data_types = ["sitting", "standing"]
-# path = './body_tracking/training_images/'
+# path = './scripts/training_images/'
 # FLIP = False
 
 # Is interesting
