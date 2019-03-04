@@ -9,7 +9,6 @@ from tf_pose.estimator import TfPoseEstimator
 from tf_pose.networks import get_graph_path, model_wh
 
 import tensorflow as tf
-from is_standing_model_generation.create_model import parse_csv
 
 from tf_pose.common import CocoPart
 
@@ -30,7 +29,7 @@ frame_count = 0
 if __name__ == '__main__':
     # Load is_standing network
     path = "is_standing_model_generation/c1200_no_bad/"
-    name = "c1200_no_bad"
+    name = "c1200_no_bad_v2"
     json_file = open(path + name + ".json", 'r')
     loaded_model_json = json_file.read()
     json_file.close()
@@ -76,17 +75,18 @@ if __name__ == '__main__':
         else: # 1 human
             human = humans[0]
             joint_data = []
+            body_parts_not_to_add = [18, 3,4] # Dont add Background, RElbow, LElbow
             for value, body_part_name  in enumerate(CocoPart):
-                if value in human.body_parts:
+                if value in human.body_parts and value not in body_parts_not_to_add:
                     body_part = human.body_parts[value]
                     joint_data.append(body_part.x)
                     joint_data.append(body_part.y)
                     joint_data.append(body_part.score)
-                else:
+                elif value not in body_parts_not_to_add:
                     joint_data.append(-1)
                     joint_data.append(-1)
                     joint_data.append(0)
-            features = tf.reshape(joint_data, shape=(1, 19*3))
+            features = tf.reshape(joint_data, shape=(1, 16*3))
             prediction = loaded_model.predict(features, steps=1)[0]
             if(prediction[0] > prediction[1]):
                 cv2.putText(image,
