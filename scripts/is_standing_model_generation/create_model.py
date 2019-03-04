@@ -59,12 +59,12 @@ es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', mode='min',
                     verbose=1, patience=100)
 mc = tf.keras.callbacks.ModelCheckpoint('best_model.h5',
                     monitor='val_acc',
-                    mode='max', verbose=1,
+                    mode='max', verbose=0,
                     save_best_only=True)
 history = model.fit(training_features, training_labels,
         epochs=4001,
         batch_size=32,
-        verbose=0,
+        verbose=1,
         validation_data=(validation_features, validation_labels),
         class_weight={0:0.5, 1:1},
         callbacks=[es, mc])
@@ -86,13 +86,6 @@ plt.ylabel('Loss')
 plt.xlabel('Epoch')
 plt.legend(['Train', 'Test'], loc='upper left')
 plt.show()
-
-if (input('Press k to save model or anykey otherwise:') == "k"):
-    print("Saving model")
-    SAVE_MODEL = True
-else:
-    print("Discarding model")
-    SAVE_MODEL = False
 
 if (testing_percent > 0):
     test_loss, test_acc = saved_model.evaluate(testing_features, testing_labels)
@@ -135,6 +128,12 @@ if (testing_percent > 0):
                p_sitting_actual_standing/total,
                p_sitting_actual_standing/tot_standing))
 
+if (input('Press k to save model or anykey otherwise:') == "k"):
+    print("Saving model")
+    SAVE_MODEL = True
+else:
+    print("Discarding model")
+    SAVE_MODEL = False
 # serialize model to JSON
 if (SAVE_MODEL):
     model_json = saved_model.to_json()
