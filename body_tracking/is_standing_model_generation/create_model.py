@@ -14,6 +14,7 @@ validation_percent = 0.1
 testing_percent = 1-training_percent-validation_percent
 
 all_data = all_data[:,:-3] # Get rid of Background
+all_data = np.hstack((all_data[:,:19], all_data[:,25:])) # No LElbow or LWrist
 all_data = np.hstack((all_data[:,:10], all_data[:,16:])) # No RElbow or RWrist
 
 np.random.seed(0)
@@ -38,7 +39,7 @@ validation_features = validation_data[:,2:]
 reg_lamb = 0.01
 
 model = tf.keras.Sequential([
-  tf.keras.layers.Dense(25, activation="relu", input_shape=(16*3,),
+  tf.keras.layers.Dense(25, activation="relu", input_shape=(14*3,),
                         kernel_regularizer=tf.keras.regularizers.l2(reg_lamb)),
   tf.keras.layers.Dense(10, activation="relu",
                         kernel_regularizer=tf.keras.regularizers.l2(reg_lamb)),

@@ -75,7 +75,8 @@ if __name__ == '__main__':
         else: # 1 human
             human = humans[0]
             joint_data = []
-            body_parts_not_to_add = [18, 3,4] # Dont add Background, RElbow, LElbow
+            # Dont add Background, RElbow, RWrist, LElbow, LWrist
+            body_parts_not_to_add = [18,3,4,6,7]
             for value, body_part_name  in enumerate(CocoPart):
                 if value in human.body_parts and value not in body_parts_not_to_add:
                     body_part = human.body_parts[value]
@@ -86,7 +87,7 @@ if __name__ == '__main__':
                     joint_data.append(-1)
                     joint_data.append(-1)
                     joint_data.append(0)
-            features = tf.reshape(joint_data, shape=(1, 16*3))
+            features = tf.reshape(joint_data, shape=(1, 14*3))
             prediction = loaded_model.predict(features, steps=1)[0]
             if(prediction[0] > prediction[1]):
                 cv2.putText(image,
