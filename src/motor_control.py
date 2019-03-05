@@ -31,55 +31,56 @@ class MotorControl(object):
     MULTI_MOTOR_SET_CMD = "multi_motor_set"
     MOTOR_STOP_CMD = "motor_stop"
     MULTI_MOTOR_STOP_CMD = "multi_motor_stop"
-    TOP_MOTOR_ID = "0"
-    BOT_MOTOR_ID = "1"
-    CW = "1"
-    CCW = "-1"
+    BOT_MOTOR_ID = "0"
+    TOP_MOTOR_ID = "1"
+    CW = "-1"
+    CCW = "1"
     
     def __init__(self):
-        self.ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+        # self.ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1) # Jetson
+        self.ser = serial.Serial("/dev/tty.usbmodem14101", 9600, timeout=1) # OSX
         time.sleep(3)
 
     def build_serial_motor_cmd(self, motor_id, angle):
-        return MOTOR_SET_CMD + " " + str(motor_id) + " " + str(angle)
+        return self.MOTOR_SET_CMD + " " + str(motor_id) + " " + str(angle)
 
     def build_serial_multi_motor_cmd(self, topAngle, botAngle):
-        return MULTI_MOTOR_SET_CMD + " " + str(topAngle) + " " + str(botAngle)
+        return self.MULTI_MOTOR_SET_CMD + " " + str(topAngle) + " " + str(botAngle)
 
     def build_serial_motor_stop_cmd(self, id):
-        return MOTOR_STOP_CMD + " " + str(id)
+        return self.MOTOR_STOP_CMD + " " + str(id)
 
     def build_serial_multi_motor_stop_cmd(self):
-        return MULTI_MOTOR_STOP_CMD
+        return self.MULTI_MOTOR_STOP_CMD
 
     def runTopMotor(self, angle):
-        cmd = self.build_serial_motor_cmd(TOP_MOTOR_ID, angle)
-        self.ser.write(cmd)
+        cmd = self.build_serial_motor_cmd(self.TOP_MOTOR_ID, angle)
+        self.ser.write(cmd.encode())
 
     def runBotMotor(self, angle):
-        cmd = self.build_serial_motor_cmd(BOT_MOTOR_ID, angle)
-        self.ser.write(cmd)
+        cmd = self.build_serial_motor_cmd(self.BOT_MOTOR_ID, angle)
+        self.ser.write(cmd.encode())
 
     def runMotor(self, motor_id, angle):
-        if motor_id == TOP_MOTOR_ID:
+        if motor_id == self.TOP_MOTOR_ID:
             self.runTopMotor(angle)
-        elif motor_id == BOT_MOTOR_ID:
+        elif motor_id == self.BOT_MOTOR_ID:
             self.runBotMotor(angle)
         else:
             print("Could not run motor: invalid motor ID")
 
     def runMotors(self, topAngle, botAngle):
         cmd = self.build_serial_multi_motor_cmd(topAngle, botAngle)
-        self.ser.write(cmd)
+        self.ser.write(cmd.encode())
 
     def stopTopMotor(self):
-        cmd = self.build_serial_motor_stop_cmd(TOP_MOTOR_ID)
-        self.ser.write(cmd)
+        cmd = self.build_serial_motor_stop_cmd(self.TOP_MOTOR_ID)
+        self.ser.write(cmd.encode())
 
     def stopTopMotor(self):
-        cmd = self.build_serial_motor_stop_cmd(BOT_MOTOR_ID)
-        self.ser.write(cmd)
+        cmd = self.build_serial_motor_stop_cmd(self.BOT_MOTOR_ID)
+        self.ser.write(cmd.encode())
 
     def stopMotors(self):
         cmd = self.build_serial_multi_motor_stop_cmd()
-        self.ser.write(cmd)
+        self.ser.write(cmd.encode())
