@@ -31,6 +31,13 @@
 
 6. Clone the [MMNT repo](https://github.com/alexanderyshi/mmnt)
 
+7. Setup for mmnt environment
+    ```sh
+sudo apt-get update
+sudo pip install pyusb
+sudo pip install pyserial
+brew install libusb
+    ```
 
 ## Other Useful Links
 * https://devtalk.nvidia.com/default/topic/1025356/how-to-capture-and-display-camera-video-with-python-on-jetson-tx2/
