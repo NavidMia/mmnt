@@ -46,3 +46,25 @@ def is_standing(model, human):
     features = tf.reshape(joint_data, shape=(1, 14*3))
     prediction = model.predict(features, steps=1)[0]
     return (prediction[0] > prediction[1])
+
+def is_hands_above_head(human):
+    arm_parts = [CocoPart.RElbow.value,
+                 CocoPart.LElbow.value,
+                 CocoPart.RWrist.value,
+                 CocoPart.LWrist.value]
+    vissible_arm_parts = [joint for joint in arm_parts if joint in human.body_parts]
+    if vissible_arm_parts == []:
+        return False
+    head_parts = [CocoPart.Nose.value,
+                 CocoPart.Neck.value,
+                 CocoPart.REye.value,
+                 CocoPart.LEye.value,
+                 CocoPart.REar.value,
+                 CocoPart.LEar.value]
+    vissible_head_parts = [head_part for head_part in head_parts if head_part in human.body_parts]
+    if vissible_head_parts == []:
+        return False
+    head_y_vals = [human.body_parts[part].y for part in vissible_head_parts]
+    arm_y_vals = [human.body_parts[part].y for part in vissible_arm_parts]
+    # Y values are percent from top of the sceen (0,0) is top left, (1,1) is bottom right
+    return min(arm_y_vals) < min(head_y_vals)

@@ -128,7 +128,7 @@ if (testing_percent > 0):
                p_sitting_actual_standing/total,
                p_sitting_actual_standing/tot_standing))
 
-if (input('Press k to save model or anykey otherwise:') == "k"):
+if (input('Press s to save model or anykey otherwise:') == "s"):
     print("Saving model")
     SAVE_MODEL = True
 else:

@@ -77,6 +77,16 @@ if __name__ == '__main__':
                             "Sitting",
                             (50, 50),  cv2.FONT_HERSHEY_SIMPLEX, 2,
                             (0, 0, 255), 2)
+            if(nn.is_hands_above_head(human)):
+                cv2.putText(image,
+                            "Above head",
+                            (50, 100),  cv2.FONT_HERSHEY_SIMPLEX, 2,
+                            (0, 255, 0), 2)
+            else:
+                cv2.putText(image,
+                            "Below head",
+                            (50, 100),  cv2.FONT_HERSHEY_SIMPLEX, 2,
+                            (0, 0, 255), 2)
         cv2.imshow('tf-pose-estimation result', image)
         fps_time = time.time()
         key = cv2.waitKey(key_listener_duration)
