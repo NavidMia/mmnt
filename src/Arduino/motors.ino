@@ -4,6 +4,7 @@ int msPinBot = 4;
 int dirPinTop = 7;
 int stepperPinTop = 6;
 int msPinTop = 5;
+int sleepPin = 13;
 
 float stepSize = 1.8/8;
 float stepsPerRev = 360/stepSize;
@@ -18,6 +19,8 @@ float botPos = 0;
 float botTargetPos = 0;
 int botDir = 1; // 1 = CCW, -1 = CW
 bool stepBot = false;
+
+bool sleep = true;
 
 #define POS_THRESHOLD (2)
 #define TOP_PULSE_DELAY (1500) // delay in microseconds
@@ -36,9 +39,11 @@ void setup() {
     pinMode(stepperPinBot, OUTPUT);
     pinMode(msPinTop, OUTPUT);
     pinMode(msPinBot, OUTPUT);
+    pinMode(sleepPin, OUTPUT);
 
     digitalWrite(msPinTop, HIGH);
     digitalWrite(msPinBot, HIGH);
+    digitalWrite(sleepPin, LOW);
 
     Serial.begin(9600);
 }
@@ -90,7 +95,6 @@ void handleMotorStopCommand() {
 //   multi_motor_stop
 //   e.g.: multi_motor_stop
 void handleMultiMotorStopCommand() {
-    Serial.print("stopping motors\n");
     topTargetPos = topPos;
     botTargetPos = botPos;
 }
@@ -143,6 +147,14 @@ void loop() {
         stepBot = true;
     } else {
         stepBot = false;
+    }
+
+    if ((stepTop || stepBot) && sleep) {
+        digitalWrite(sleepPin, HIGH);
+        sleep = false;
+    } else if (!(stepTop || stepBot) && !sleep) {
+        digitalWrite(sleepPin, LOW);
+        sleep = true;
     }
 
     // rotate motors if needed
