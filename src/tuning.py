@@ -121,6 +121,9 @@ class Tuning:
     def is_voice(self):
         return self.read('VOICEACTIVITY')
 
+    def speech_detected(self):
+        return self.read('SPEECHDETECTED')
+
     @property
     def direction(self):
         return self.read('DOAANGLE')
