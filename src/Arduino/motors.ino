@@ -21,10 +21,12 @@ int botDir = 1; // 1 = CCW, -1 = CW
 bool stepBot = false;
 
 bool sleep = true;
+unsigned long sleepStart = millis();
 
 #define POS_THRESHOLD (2)
 #define TOP_PULSE_DELAY (1500) // delay in microseconds
 #define BOT_PULSE_DELAY (1500) // delay in microseconds
+
 #define DIR_WRITE_DELAY (50) // delay in milliseconds
 #define CW (-1)
 #define CCW (1)
@@ -152,7 +154,8 @@ void loop() {
     if ((stepTop || stepBot) && sleep) {
         digitalWrite(sleepPin, HIGH);
         sleep = false;
-    } else if (!(stepTop || stepBot) && !sleep) {
+        sleepStart = millis();
+    } else if (!(stepTop || stepBot) && !sleep && ((millis() - sleepStart) > 2000)) {
         digitalWrite(sleepPin, LOW);
         sleep = true;
     }
@@ -179,12 +182,12 @@ void loop() {
             botPos = botPos + botDir * stepSize * STEPS * gearRatio;
         }
         if (topPos < 0) {
-            topPos = 360 - topPos;
+            topPos = 360 + topPos;
         } else if (topPos > 359) {
             topPos = topPos - 359;
         }
         if (botPos < 0) {
-            botPos = 360 - botPos;
+            botPos = 360 + botPos;
         } else if (botPos > 359) {
             botPos = botPos - 359;
         }
@@ -196,7 +199,7 @@ void loop() {
         }
         topPos = topPos + topDir * stepSize * STEPS * gearRatio;
         if (topPos < 0) {
-            topPos = 360 - topPos;
+            topPos = 360 + topPos;
         } else if (topPos > 359) {
             topPos = topPos - 359;
         }
@@ -214,7 +217,7 @@ void loop() {
         }
         botPos = botPos + botDir * stepSize * STEPS * gearRatio;
         if (botPos < 0) {
-            botPos = 360 - botPos;
+            botPos = 360 + botPos;
         } else if (botPos > 359) {
             botPos = botPos - 359;
         }
