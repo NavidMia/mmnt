@@ -7,25 +7,18 @@ int msPinTop = 5;
 int sleepPin = 13;
 
 float stepSize = 1.8/8;
-float stepsPerRev = 360/stepSize;
 float gearRatio = 36.0/45.0;
-
-float topPos = 0;
-float topTargetPos = 0;
-int topDir = 1; // 1 = CCW, -1 = CW
-bool stepTop = false;
-
-float botPos = 0;
-float botTargetPos = 0;
-int botDir = 1; // 1 = CCW, -1 = CW
-bool stepBot = false;
 
 bool sleep = true;
 unsigned long sleepStart = millis();
 
 #define POS_THRESHOLD (2)
-#define TOP_PULSE_DELAY (1500) // delay in microseconds
-#define BOT_PULSE_DELAY (1500) // delay in microseconds
+
+#define MAX_PULSE_DELAY (5000)
+#define MIN_PULSE_DELAY (1500)
+#define UPPER_DELAY_ANGLE (20)
+#define LOWER_DELAY_ANGLE (0)
+#define DELAY_GAIN ((MAX_PULSE_DELAY - MIN_PULSE_DELAY)/(LOWER_DELAY_ANGLE - UPPER_DELAY_ANGLE))
 
 #define DIR_WRITE_DELAY (50) // delay in milliseconds
 #define CW (-1)
@@ -34,6 +27,18 @@ unsigned long sleepStart = millis();
 #define TOP_MOTOR_ID (1)
 #define STEPS (10)
 
+#define BOT_MOTOR_INITIAL_POS (180)
+#define TOP_MOTOR_INITIAL_POS (0)
+
+float topPos = TOP_MOTOR_INITIAL_POS;
+float topTargetPos = TOP_MOTOR_INITIAL_POS;
+int topDir = 1; // 1 = CCW, -1 = CW
+bool stepTop = false;
+
+float botPos = BOT_MOTOR_INITIAL_POS;
+float botTargetPos = BOT_MOTOR_INITIAL_POS;
+int botDir = 1; // 1 = CCW, -1 = CW
+bool stepBot = false;
 void setup() {
     pinMode(dirPinTop, OUTPUT);
     pinMode(stepperPinTop, OUTPUT);
@@ -101,6 +106,14 @@ void handleMultiMotorStopCommand() {
     botTargetPos = botPos;
 }
 
+// serial command for resetting motor positions:
+//   reset_motors
+//   e.g.: reset_motors
+void handleResetMotorsCommand() {
+    topTargetPos = TOP_MOTOR_INITIAL_POS;
+    botTargetPos = BOT_MOTOR_INITIAL_POS;
+}
+
 void loop() {
     // Check if new command is available and parse it to update motor parameters
     if (Serial.available()) {
@@ -116,6 +129,8 @@ void loop() {
                 handleMotorStopCommand();
             } else if (!strcmp(cmd, "multi_motor_stop")) {
                 handleMultiMotorStopCommand();
+            } else if (!strcmp(cmd, "reset_motors")) {
+                handleResetMotorsCommand();
             }
             cmd = strtok(NULL, " ");
         }
@@ -162,11 +177,13 @@ void loop() {
 
     // rotate motors if needed
     if (stepTop && stepBot) {
+        int targetDiff = abs(int(botPos - botTargetPos));
+        int stepDelay = DELAY_GAIN * min(targetDiff, UPPER_DELAY_ANGLE) + MAX_PULSE_DELAY;
         if (topDir != botDir) {
             for (int i = 0; i < STEPS; i++) {
                 if (i < STEPS/2) digitalWrite(stepperPinBot, HIGH);
                 digitalWrite(stepperPinTop, HIGH);
-                delayMicroseconds(BOT_PULSE_DELAY);
+                delayMicroseconds(stepDelay);
                 if (i < STEPS/2) digitalWrite(stepperPinBot, LOW);
                 digitalWrite(stepperPinTop, LOW);
             }
@@ -175,7 +192,7 @@ void loop() {
         } else {
             for (int i = 0; i < STEPS; i++) {
                 digitalWrite(stepperPinBot, HIGH);
-                delayMicroseconds(BOT_PULSE_DELAY);
+                delayMicroseconds(stepDelay);
                 digitalWrite(stepperPinBot, LOW);
             }
             topPos = topPos + topDir * stepSize * STEPS * gearRatio;
@@ -192,9 +209,11 @@ void loop() {
             botPos = botPos - 359;
         }
     } else if (stepTop) {
+        int targetDiff = abs(int(topPos - topTargetPos));
+        int stepDelay = DELAY_GAIN * min(targetDiff, UPPER_DELAY_ANGLE) + MAX_PULSE_DELAY;
         for (int i = 0; i < STEPS; i++) {
             digitalWrite(stepperPinTop, HIGH);
-            delayMicroseconds(TOP_PULSE_DELAY);
+            delayMicroseconds(stepDelay);
             digitalWrite(stepperPinTop, LOW);
         }
         topPos = topPos + topDir * stepSize * STEPS * gearRatio;
@@ -204,6 +223,9 @@ void loop() {
             topPos = topPos - 359;
         }
     } else if (stepBot) {
+        int targetDiff = abs(int(botPos - botTargetPos));
+        int stepDelay = DELAY_GAIN * min(targetDiff, UPPER_DELAY_ANGLE) + MAX_PULSE_DELAY;
+
         if (topDir == botDir) {
             topDir = botDir * -1;
             digitalWrite(dirPinTop, topDir == CW ? true : false);
@@ -211,7 +233,7 @@ void loop() {
         for (int i = 0; i < STEPS; i++) {
             digitalWrite(stepperPinBot, HIGH);
             digitalWrite(stepperPinTop, HIGH);
-            delayMicroseconds(BOT_PULSE_DELAY);
+            delayMicroseconds(stepDelay);
             digitalWrite(stepperPinBot, LOW);
             digitalWrite(stepperPinTop, LOW);
         }
