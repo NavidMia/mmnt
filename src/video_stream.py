@@ -4,7 +4,7 @@ from threading import Thread
 
 class VideoStream:
     DEFAULT_WIDTH = 640
-    DEFAULT_HEIGHT = 480
+    DEFAULT_HEIGHT = 360
     
     def __init__(self, camera=-1, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
         if camera == -1:

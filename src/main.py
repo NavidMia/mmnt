@@ -7,126 +7,210 @@ import sys
 import usb.core
 import usb.util
 import serial
+import logging
 
 import cv2 as cv
 import numpy as np
+import human_tracking as ht
 
-# from tf_pose.estimator import TfPoseEstimator
-# from tf_pose.networks import get_graph_path, model_wh
+from tf_pose.estimator import TfPoseEstimator
+from tf_pose.networks import get_graph_path, model_wh
+from tf_pose.common import CocoPart
+
 from tuning import Tuning
 from motor_control import MotorControl
 from video_stream import VideoStream
 
-MMNT_SETUP_PRESENT = True
+DISPLAY_VIDEO = False
 
-TOP_CAM_ID = "0"
-BOT_CAM_ID = "1"
+RESIZE_RATIO = 4.0
+BOT_CAM_ID = "0"
+TOP_CAM_ID = "1"
 TF_MODEL = "mobilenet_thin" # alternative option: "cmu"
 ANGLE_THRESHOLD = 5
-FACE_THRESHOLD = 50
+FACE_THRESHOLD = float(VideoStream.DEFAULT_WIDTH) / 3.0 / 2.0 + 40
 FOV = 60
+
+MASTER_SAMPLE_FREQ = 2.5
+SLAVE_SAMPLE_FREQ = 0.1
+SLAVE_MASTER_THRESHOLD = 45
+
 degreePerPixel = float(FOV) / float(VideoStream.DEFAULT_WIDTH)
 
+headParts = [CocoPart.Nose.value,
+             CocoPart.REye.value,
+             CocoPart.LEye.value,
+             CocoPart.REar.value,
+             CocoPart.LEar.value,
+             CocoPart.Neck.value]
+
 def main():
-    print("initializing")
-    if MMNT_SETUP_PRESENT:
-        mc = MotorControl()
-        print("initialized motor control")
-        dev = usb.core.find(idVendor=0x2886, idProduct=0x0018)
-        if not dev:
-            sys.exit("Could not find ReSpeaker Mic Array through USB")
-        mic = Tuning(dev)
-        mic.write("NONSTATNOISEONOFF", 1)
-        mic.write("STATNOISEONOFF", 1)
-        print("initialized microphone")
+    logging.basicConfig()
+    logger = logging.getLogger("MMNT")
+    logger.setLevel(logging.INFO)
+    logger.info("Initializing")
 
-    if MMNT_SETUP_PRESENT:
-        face_cascade = cv.CascadeClassifier('/home/nvidia/mmnt/opencv/data/haarcascades_cuda/haarcascade_frontalface_default.xml')
-    else:
-        face_cascade = cv.CascadeClassifier('/home/nvidia/sd/opencv/data/haarcascades_cuda/haarcascade_frontalface_default.xml')
-    # tfPose = TfPoseEstimator(get_graph_path(TF_MODEL), target_size=(VideoStream.DEFAULT_WIDTH, VideoStream.DEFAULT_HEIGHT))
+    masterSampleTime = time.time()
+    slaveSampleTime = time.time()
 
-    topCamStream = VideoStream()
-    botCamStream = VideoStream(1)
+    logger.debug("Initializing motor control")
+    mc = MotorControl()
+    mc.resetMotors()
+    logger.debug("Initializing microphone")
+    dev = usb.core.find(idVendor=0x2886, idProduct=0x0018)
+    if not dev:
+        sys.exit("Could not find ReSpeaker Mic Array through USB")
+    mic = Tuning(dev)
+    mic.write("NONSTATNOISEONOFF", 1)
+    mic.write("STATNOISEONOFF", 1)
+
+    logger.debug("Initializing models")
+    ht_model = ht.get_model()
+    tfPose = TfPoseEstimator(get_graph_path(TF_MODEL), target_size=(VideoStream.DEFAULT_WIDTH, VideoStream.DEFAULT_HEIGHT))
+
+    logger.debug("Initializing video streams")
+    topCamStream = VideoStream(1)
+    botCamStream = VideoStream(2)
 
     topCamStream.start()
     botCamStream.start()
 
-    slaveCamID = BOT_CAM_ID
-    slaveStream = botCamStream
+
     masterCamID = TOP_CAM_ID
     masterStream = topCamStream
+    slaveCamID = BOT_CAM_ID
+    slaveStream = botCamStream
 
-    slaveTargetAngle = 0
     masterTargetAngle = 0
+    slaveTargetAngle = 180
 
-    updateSlaveAngle = False
     updateMasterAngle = False
-    print("initialized video streams")
+    updateSlaveAngle = False
 
+    masterTracking = False
+
+    logger.info("Initialization complete")
     while True:
         try:
             # MASTER
             masterFrame = masterStream.read()
-            gray = cv.cvtColor(masterFrame, cv.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-            # Focus on first face for now
-            if faces:
-                (x, y, w, h) = faces[0]
-                midX = x + w/2
-                centerDiff = abs(midX - VideoStream.DEFAULT_WIDTH/2)
-                if centerDiff > FACE_THRESHOLD:
-                    if midX < VideoStream.DEFAULT_WIDTH/2:
-                        # rotate CCW
-                        masterTargetAngle += centerDiff * degreePerPixel
-                    elif midX > VideoStream.DEFAULT_WIDTH/2:
-                        # rotate CW
-                        masterTargetAngle -= centerDiff * degreePerPixel
+            if time.time() - masterSampleTime > MASTER_SAMPLE_FREQ:
+                humans = tfPose.inference(masterFrame, resize_to_default=True, upsample_size=RESIZE_RATIO)
+                if len(humans):
+                    logger.debug("Master tracking")
+                    masterTracking = True
+                    if DISPLAY_VIDEO:
+                        TfPoseEstimator.draw_humans(masterFrame, humans, imgcopy=False)
+                    human = humans[0]
+                    if (ht.is_hands_above_head(human)):
+                        logger.debug("HANDS ABOVE HEAD!!!")
+                    midX = -1
+                    for part in headParts:
+                        if part in human.body_parts:
+                            midX = human.body_parts[part].x * VideoStream.DEFAULT_WIDTH
+                            break
+                    if midX != -1:
+                        centerDiff = abs(midX - VideoStream.DEFAULT_WIDTH/2)
+                        if centerDiff > FACE_THRESHOLD:
+                            if midX < VideoStream.DEFAULT_WIDTH/2:
+                                # rotate CCW
+                                masterTargetAngle += centerDiff * degreePerPixel
+                            elif midX > VideoStream.DEFAULT_WIDTH/2:
+                                # rotate CW
+                                masterTargetAngle -= centerDiff * degreePerPixel
 
-                    updateMasterAngle = True
+                            masterTargetAngle = masterTargetAngle % 360
+                            updateMasterAngle = True
+                            masterSampleTime = time.time()
+                else:
+                    logger.debug("Master stopped tracking")
+                    masterTracking = False
+
+                # If master is not tracking a human, move towards speech
+                if not masterTracking:
+                    speechDetected, micDOA = mic.speech_detected(), mic.direction
+                    logger.debug("master speech detected:", speechDetected, "diff:", abs(micDOA - masterTargetAngle))
+                    if speechDetected and abs(micDOA - masterTargetAngle) > ANGLE_THRESHOLD:
+                        masterTargetAngle = micDOA
+                        logger.debug("Update master angle:", masterTargetAngle)
+                        masterSampleTime = time.time()
+                        updateMasterAngle = True
 
             # SLAVE
             slaveFrame = slaveStream.read()
-            if MMNT_SETUP_PRESENT:
-                if abs(mic.direction - slaveTargetAngle) > ANGLE_THRESHOLD:
-                    slaveTargetAngle = mic.direction
+            if time.time() - slaveSampleTime > SLAVE_SAMPLE_FREQ:
+                # If master is not tracking a human and a slave sees a human, move master to the visible human and move slave away
+                if not masterTracking and time.time() - masterSampleTime > MASTER_SAMPLE_FREQ:
+                    humans = tfPose.inference(slaveFrame, resize_to_default=True, upsample_size=RESIZE_RATIO)
+                    if len(humans):
+                        logger.debug("slave found mans")
+                        if DISPLAY_VIDEO:
+                            TfPoseEstimator.draw_humans(slaveFrame, humans, imgcopy=False)
+                        human = humans[0]
+                        if (ht.is_hands_above_head(human)):
+                            logger.debug("HANDS ABOVE HEAD!!!")
+                        midX = -1
+                        for part in headParts:
+                            if part in human.body_parts:
+                                midX = human.body_parts[part].x * VideoStream.DEFAULT_WIDTH
+                                break
+                        if midX != -1:
+                            centerDiff = abs(midX - VideoStream.DEFAULT_WIDTH/2)
+                            # if centerDiff > FACE_THRESHOLD:
+                            if midX < VideoStream.DEFAULT_WIDTH/2:
+                                # rotate CCW
+                                masterTargetAngle = slaveTargetAngle + centerDiff * degreePerPixel
+                            elif midX > VideoStream.DEFAULT_WIDTH/2:
+                                # rotate CW
+                                masterTargetAngle = slaveTargetAngle - centerDiff * degreePerPixel
+
+                            masterTargetAngle = masterTargetAngle % 360
+                            updateMasterAngle = True
+                            masterSampleTime = time.time()
+                            slaveTargetAngle = (masterTargetAngle + 180) % 360
+                            updateSlaveAngle = True
+                            logger.debug("Moving master to slave:", masterTargetAngle)
+
+                speechDetected, micDOA = mic.speech_detected(), mic.direction
+                speechMasterDiff = abs(micDOA - masterTargetAngle)
+                if speechDetected and speechMasterDiff > SLAVE_MASTER_THRESHOLD and abs(micDOA - slaveTargetAngle) > ANGLE_THRESHOLD:
+                    slaveTargetAngle = micDOA
+                    logger.debug("Update slave angle:", slaveTargetAngle)
+                    slaveSampleTime = time.time()
                     updateSlaveAngle = True
-                # humans = e.inference(image, resize_to_default=True, upsample_size=4.0)
+
 
             # Send Serial Commands
-                if updateSlaveAngle and updateMasterAngle:
-                    print("Slave Angle:", slaveTargetAngle)
-                    print("Master Angle:", masterTargetAngle)
-                    updateSlaveAngle = False
-                    updateMasterAngle = False
-                    if slaveCamID == BOT_CAM_ID:
-                        mc.runMotors(masterTargetAngle, slaveTargetAngle)
-                    else:
-                        mc.runMotors(slaveTargetAngle, masterTargetAngle)
-                elif updateSlaveAngle:
-                    mc.runMotor(slaveCamID, slaveTargetAngle)
-                    print("Slave Angle:", slaveTargetAngle)
-                    updateSlaveAngle = False
-                elif updateMasterAngle:
-                    mc.runMotor(masterCamID, masterTargetAngle)
-                    print("Master Angle:", masterTargetAngle)
-                    updateMasterAngle = False
+            if updateSlaveAngle and updateMasterAngle:
+                logger.debug("Slave Angle:", slaveTargetAngle)
+                logger.debug("Master Angle:", masterTargetAngle)
+                updateSlaveAngle = False
+                updateMasterAngle = False
+                if slaveCamID == BOT_CAM_ID:
+                    mc.runMotors(masterTargetAngle, slaveTargetAngle)
+                else:
+                    mc.runMotors(slaveTargetAngle, masterTargetAngle)
+            elif updateSlaveAngle:
+                mc.runMotor(slaveCamID, slaveTargetAngle)
+                logger.debug("Slave Angle:", slaveTargetAngle)
+                updateSlaveAngle = False
+            elif updateMasterAngle:
+                mc.runMotor(masterCamID, masterTargetAngle)
+                logger.debug("Master Angle:", masterTargetAngle)
+                updateMasterAngle = False
 
-            # 1) Sleep if not showing frames
-            time.sleep(2)
-
-            # OR 2) Display debug frames
-            # cv.imshow('Master Camera', masterFrame)
-            # cv.imshow('Slave Camera', slaveFrame)
-            # if cv.waitKey(1) == 27:
-            #     pass
+            if DISPLAY_VIDEO:
+                cv.imshow('Master Camera', masterFrame)
+                cv.imshow('Slave Camera', slaveFrame)
+                if cv.waitKey(1) == 27:
+                    pass
 
         except KeyboardInterrupt:
-            print("Keyboard interrupt! Terminating.")
-            if MMNT_SETUP_PRESENT:
-                mc.stopMotors()
+            logger.debug("Keyboard interrupt! Terminating.")
+            mc.stopMotors()
             slaveStream.stop()
             masterStream.stop()
+            mic.close()
             time.sleep(2)
             break
 
