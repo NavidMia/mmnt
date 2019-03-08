@@ -44,8 +44,6 @@ headParts = [CocoPart.Nose.value,
              CocoPart.LEar.value,
              CocoPart.Neck.value]
 
-# logging.basicConfig(level=logging.INFO)
-
 def main():
     logging.basicConfig()
     logger = logging.getLogger("MMNT")
