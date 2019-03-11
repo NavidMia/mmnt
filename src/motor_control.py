@@ -31,14 +31,15 @@ class MotorControl(object):
     MULTI_MOTOR_SET_CMD = "multi_motor_set"
     MOTOR_STOP_CMD = "motor_stop"
     MULTI_MOTOR_STOP_CMD = "multi_motor_stop"
+    MOTORS_RESET_CMD = "reset_motors"
     BOT_MOTOR_ID = "0"
     TOP_MOTOR_ID = "1"
     CW = "-1"
     CCW = "1"
     
     def __init__(self):
-        # self.ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1) # Jetson
-        self.ser = serial.Serial("/dev/tty.usbmodem14101", 9600, timeout=1) # OSX
+        self.ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1) # Jetson
+        # self.ser = serial.Serial("/dev/tty.usbmodem141201", 9600, timeout=1) # OSX
         time.sleep(3)
 
     def build_serial_motor_cmd(self, motor_id, angle):
@@ -52,6 +53,9 @@ class MotorControl(object):
 
     def build_serial_multi_motor_stop_cmd(self):
         return self.MULTI_MOTOR_STOP_CMD
+
+    def build_serial_reset_motors_cmd(self):
+        return self.MOTORS_RESET_CMD
 
     def runTopMotor(self, angle):
         cmd = self.build_serial_motor_cmd(self.TOP_MOTOR_ID, angle)
@@ -83,4 +87,8 @@ class MotorControl(object):
 
     def stopMotors(self):
         cmd = self.build_serial_multi_motor_stop_cmd()
+        self.ser.write(cmd.encode())
+
+    def resetMotors(self):
+        cmd = self.build_serial_reset_motors_cmd()
         self.ser.write(cmd.encode())

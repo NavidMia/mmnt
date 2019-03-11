@@ -33,15 +33,31 @@ start_time = time.time()
 # display_images = SORT
 # variable_name = "standing (0) sitting(1) unknown (2), "
 
+# path = "./training_images/"
+# data_types = ["standing", "sitting", "bad"]
+# store_folder = "human_drawn/"
+# FLIP = True
+# SORT = False
+# display_images = False
+# variable_name = "standing (0) sitting(1) unknown (2), "
+
+# path = "./training_images/"
+# data_types = ["sitting_norm_og"]
+# store_folder = "human_drawn/"
+# FLIP = True
+# SORT = True
+# display_images = False
+# variable_name = "standing (0) sitting(1) unknown (2), "
+
 path = "./training_images/"
-data_types = ["standing", "sitting", "bad"]
+data_types = ["standing_norm", "sitting_norm"]
 store_folder = "human_drawn/"
 FLIP = True
 SORT = False
 display_images = False
 variable_name = "standing (0) sitting(1) unknown (2), "
 
-with open("joint_locations_is_standing_v4.txt", "w") as output_file:
+with open("joint_locations_is_standing_sitting_norm.txt", "w") as output_file:
     output_file.write("Data Number, "+  variable_name +
             "Nose x, Nose y, Nose score, " +
             "Neck x, Neck y, Neck score, " +
@@ -123,10 +139,10 @@ with open("joint_locations_is_standing_v4.txt", "w") as output_file:
                 while(not key_valid):
                     print("Starting while loop")
                     if key == "i":
-                        write_location = path + "standing/" + image_name
+                        write_location = path + "standing_norm/" + image_name
                         key_valid = True
                     elif key == "l":
-                        write_location = path + "sitting/" + image_name
+                        write_location = path + "sitting_norm/" + image_name
                         key_valid = True
                     elif key == "b":
                         write_location = path + "bad/" + image_name
