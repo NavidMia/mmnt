@@ -1,14 +1,11 @@
 import numpy as np
 import math
-
 import matplotlib.pyplot as plt
 
-import cv2
-
-class map:
+class Map:
     def __init__(self, degrees_per_cell_i):
         self.degrees_per_cell = degrees_per_cell_i
-        self.grid = np.full((int(math.ceil(360.0/self.degrees_per_cell))), 0.5)
+        self.grid = np.full((int(math.ceil(360.0/self.degrees_per_cell))), 0.1)
 
         self.p_noise_given_POI = 0.6
         self.p_noise_given_not_POI = 0.3
@@ -23,6 +20,12 @@ class map:
         if cell_loc > self.grid.size:
             cell_loc = cell_loc%self.grid.size
         return(cell_loc)
+
+    def get_POI_location(self):
+        max_index = np.argmax(self.grid)
+        if self.grid[max_index] > 0.4:
+            return max_index*self.degrees_per_cell + self.degrees_per_cell / 2
+        return -1
 
     # Get noise location [0,360)
     def update_map_with_noise(self, noise_location):
@@ -59,11 +62,13 @@ class map:
 
     def logit(self, p):
         return(math.log(p) - math.log(1-p))
+
     def logit_inv(self, y):
         return (math.exp(y)/(math.exp(y) + 1))
 
     def print_map(self):
         print(self.grid)
+
     def draw_map(self):
         # Pie chart, where the slices will be ordered and plotted counter-clockwise:
         sizes = np.ones(self.grid.size)

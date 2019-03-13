@@ -20,8 +20,10 @@ from tf_pose.common import CocoPart
 from tuning import Tuning
 from motor_control import MotorControl
 from video_stream import VideoStream
+from mapping.mapping import Map
 
 DISPLAY_VIDEO = True
+DRAW_ON_FRAME = False
 
 RESIZE_RATIO = 4.0
 TF_MODEL = "mobilenet_thin" # alternative option: "cmu"
@@ -79,6 +81,7 @@ class Moment(object):
         self.mic = Tuning(dev)
         self.mic.write("NONSTATNOISEONOFF", 1)
         self.mic.write("STATNOISEONOFF", 1)
+        self.mic.write("ECHOONOFF", 1)
 
         self.logger.debug("Initializing models")
         self.ht_model = ht.get_model()
@@ -101,6 +104,7 @@ class Moment(object):
         self.master = Cams.TOP
         self.logger.info("Initialization complete")
 
+        self.audioMap = Map(15)
         self.checkMic()
 
     def stop(self):
@@ -116,14 +120,38 @@ class Moment(object):
             self.botCamAngle = angle
             self.botAngleUpdated = True
 
+    def updatePositions(self):
+        # Send Serial Commands
+        if self.topAngleUpdated and self.botAngleUpdated:
+            self.logger.debug("Top Angle: {}".format(self.topCamAngle))
+            self.logger.debug("Bot Angle: {}".format(self.botCamAngle))
+            self.topAngleUpdated = False
+            self.botAngleUpdated = False
+            self.mc.runMotors(self.topCamAngle, self.botCamAngle)
+        elif self.topAngleUpdated:
+            self.logger.debug("Top Angle: {}".format(self.topCamAngle))
+            self.topAngleUpdated = False
+            self.mc.runTopMotor(self.topCamAngle)
+        elif self.botAngleUpdated:
+            self.logger.debug("Bot Angle: {}".format(self.botCamAngle))
+            self.botAngleUpdated = False
+            self.mc.runBotMotor(self.botCamAngle)
+
     def checkMic(self):
         speechDetected, micDOA = self.mic.speech_detected(), self.mic.direction
         if not speechDetected:
+            self.audioMap.update_map_with_no_noise()
             self.topCamState &= ~State.NOISE
             self.botCamState &= ~State.NOISE
             return
         self.logger.debug("speech detected from {}".format(micDOA))
+        self.audioMap.update_map_with_noise(micDOA)
 
+        micDOA = self.audioMap.get_POI_location()
+        if micDOA == -1:
+            self.logger.debug("no good audio source, {}".format(micDOA))
+            return
+        self.logger.debug("mapped audio from {}".format(micDOA))
         topDiff = abs(micDOA - self.topCamAngle)
         botDiff = abs(micDOA - self.botCamAngle)
 
@@ -181,23 +209,6 @@ class Moment(object):
                 self.updateBotAngle(micDOA)
                 self.master = Cams.TOP
 
-    def updatePositions(self):
-        # Send Serial Commands
-        if self.topAngleUpdated and self.botAngleUpdated:
-            self.logger.debug("Top Angle: {}".format(self.topCamAngle))
-            self.logger.debug("Bot Angle: {}".format(self.botCamAngle))
-            self.topAngleUpdated = False
-            self.botAngleUpdated = False
-            self.mc.runMotors(self.topCamAngle, self.botCamAngle)
-        elif self.topAngleUpdated:
-            self.logger.debug("Top Angle: {}".format(self.topCamAngle))
-            self.topAngleUpdated = False
-            self.mc.runTopMotor(self.topCamAngle)
-        elif self.botAngleUpdated:
-            self.logger.debug("Bot Angle: {}".format(self.botCamAngle))
-            self.botAngleUpdated = False
-            self.mc.runBotMotor(self.botCamAngle)
-
     def checkHumans(self, frame, camera):
         humans = self.tfPose.inference(frame, resize_to_default=True, upsample_size=RESIZE_RATIO)
         if len(humans):
@@ -210,7 +221,7 @@ class Moment(object):
                 if self.botCamState == State.BOTH:
                     self.master = Cams.BOT
 
-            if DISPLAY_VIDEO:
+            if DISPLAY_VIDEO and DRAW_ON_FRAME:
                 TfPoseEstimator.draw_humans(frame, humans, imgcopy=False)
             human = humans[0]
             if (ht.is_hands_above_head(human)):
