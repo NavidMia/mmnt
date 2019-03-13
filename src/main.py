@@ -22,8 +22,9 @@ from motor_control import MotorControl
 from video_stream import VideoStream
 from mapping.mapping import Map
 
+DEBUG = True
 DISPLAY_VIDEO = True
-DRAW_ON_FRAME = False
+DRAW_ON_FRAME = True
 
 RESIZE_RATIO = 4.0
 TF_MODEL = "mobilenet_thin" # alternative option: "cmu"
@@ -33,7 +34,7 @@ FACE_THRESHOLD = float(VideoStream.DEFAULT_WIDTH) / 3.0 / 2.0 + 40
 FOV = 60
 degreePerPixel = float(FOV) / float(VideoStream.DEFAULT_WIDTH)
 
-HUMAN_SAMPLE_FREQ = 2.0
+HUMAN_SAMPLE_FREQ = 1.75
 MIC_SAMPLE_FREQ   = 0.1
 OVERLAP_THRESHOLD = 45
 
@@ -60,8 +61,10 @@ class Moment(object):
         self.stop = False
         logging.basicConfig()
         self.logger = logging.getLogger("MMNT")
-        # self.logger.setLevel(logging.INFO)
-        self.logger.setLevel(logging.DEBUG)
+        if DEBUG:
+            self.logger.setLevel(logging.DEBUG)
+        else:
+            self.logger.setLevel(logging.INFO)
         self.logger.info("Initializing")
 
         self.masterSampleTime = time.time()
@@ -88,11 +91,12 @@ class Moment(object):
         self.tfPose = TfPoseEstimator(get_graph_path(TF_MODEL), target_size=(VideoStream.DEFAULT_WIDTH, VideoStream.DEFAULT_HEIGHT))
 
         self.logger.debug("Initializing video streams")
-        self.topCamStream = VideoStream(2)
-        self.botCamStream = VideoStream(1)
-
+        self.topCamStream = VideoStream(1)
+        self.botCamStream = VideoStream(2)
+        self.logger.debug("Starting video streams")
         self.topCamStream.start()
         self.botCamStream.start()
+        self.logger.info("Initialization complete")
 
         self.topCamState = State.IDLE
         self.botCamState = State.IDLE
@@ -102,7 +106,6 @@ class Moment(object):
         self.botCamAngle = 180
         self.botAngleUpdated = False
         self.master = Cams.TOP
-        self.logger.info("Initialization complete")
 
         self.audioMap = Map(15)
         self.checkMic()
@@ -137,49 +140,76 @@ class Moment(object):
             self.botAngleUpdated = False
             self.mc.runBotMotor(self.botCamAngle)
 
-    def checkMic(self):
-        speechDetected, micDOA = self.mic.speech_detected(), self.mic.direction
-        if not speechDetected:
-            self.audioMap.update_map_with_no_noise()
-            self.topCamState &= ~State.NOISE
-            self.botCamState &= ~State.NOISE
-            return
-        self.logger.debug("speech detected from {}".format(micDOA))
-        self.audioMap.update_map_with_noise(micDOA)
+    def isWithinNoiseFov(self, angle):
+        topDiff = abs(angle - self.topCamAngle)
+        botDiff = abs(angle - self.botCamAngle)
 
-        micDOA = self.audioMap.get_POI_location()
-        if micDOA == -1:
-            self.logger.debug("no good audio source, {}".format(micDOA))
-            return
-        self.logger.debug("mapped audio from {}".format(micDOA))
-        topDiff = abs(micDOA - self.topCamAngle)
-        botDiff = abs(micDOA - self.botCamAngle)
-
-        # Check if a camera is already looking at the noise source
         if topDiff < NOISE_ANGLE_THRESHOLD:
             self.topCamState |= State.NOISE
             if self.topCamState == State.BOTH:
                 self.master = Cams.TOP
-            return
+            return True
         else:
             self.topCamState &= ~State.NOISE
         if botDiff < NOISE_ANGLE_THRESHOLD:
             self.botCamState |= State.NOISE
             if self.botCamState == State.BOTH:
                 self.master = Cams.BOT
-            return
+            return True
         else:
             self.botCamState &= ~State.NOISE
 
+        return False
+
+    def checkMic(self):
+        speechDetected, micDOA = self.mic.speech_detected(), self.mic.direction
+        if not speechDetected:
+            # self.audioMap.update_map_with_no_noise()
+            self.topCamState &= ~State.NOISE
+            self.botCamState &= ~State.NOISE
+            return
+        self.logger.debug("speech detected from {}".format(micDOA))
+        self.audioMap.update_map_with_noise(micDOA)
+
+        primaryMicDOA, secondaryMicDOA = self.audioMap.get_POI_location()
+        if DEBUG:
+            self.audioMap.print_map()
+        if primaryMicDOA == -1:
+            self.logger.debug("no good audio source")
+            return
+
+        self.logger.debug("mapped audio from {}".format(primaryMicDOA))
+
+        # Check if camera is already looking at the primary noise source
+        if self.isWithinNoiseFov(primaryMicDOA):
+            # If camera is already looking, check the secondary noise source
+            if secondaryMicDOA == -1:
+                self.logger.debug("no good secondary audio source")
+                return
+            elif self.isWithinNoiseFov(secondaryMicDOA):
+                return
+            else:
+                micDOA = secondaryMicDOA
+        else:
+            micDOA = primaryMicDOA
+
+        topDiff = abs(micDOA - self.topCamAngle)
+        botDiff = abs(micDOA - self.botCamAngle)
+
         # Camera is NOT looking at the noise source at this point
-        # If both Cameras are not tracking a human, move the camera that is not the master
+        # If both Cameras are not tracking a human,
+        # move the closest camera
         if self.topCamState < State.HUMAN and self.botCamState < State.HUMAN:
-            if self.master != Cams.BOT:
+            if botDiff < topDiff:
                 self.botCamState |= State.NOISE
                 self.updateBotAngle(micDOA)
+                if self.botCamState == State.IDLE:
+                    self.master = Cams.TOP
             else:
                 self.topCamState |= State.NOISE
                 self.updateTopAngle(micDOA)
+                if self.topCamState == State.IDLE:
+                    self.master = Cams.BOT
         # One of the cameras are on a human, if the other camera is not on a human, move it
         elif self.topCamState < State.HUMAN:
             self.topCamState |= State.NOISE
@@ -209,6 +239,27 @@ class Moment(object):
                 self.updateBotAngle(micDOA)
                 self.master = Cams.TOP
 
+    def getBestFace(self, humans):
+        midX = -1
+        bestHuman = humans[0]
+        maxScore = 0
+        for human in humans:
+            gotMidX = False
+            score = 0
+            currMidX = -1
+            for part in headParts:
+                if part in human.body_parts:
+                    score += human.body_parts[part].score
+                    if not gotMidX:
+                        currMidX = human.body_parts[part].x * VideoStream.DEFAULT_WIDTH
+                        gotMidX = True
+            if score > maxScore:
+                maxScore = score
+                midX = currMidX
+                bestHuman = human
+
+        return bestHuman, midX
+
     def checkHumans(self, frame, camera):
         humans = self.tfPose.inference(frame, resize_to_default=True, upsample_size=RESIZE_RATIO)
         if len(humans):
@@ -223,14 +274,18 @@ class Moment(object):
 
             if DISPLAY_VIDEO and DRAW_ON_FRAME:
                 TfPoseEstimator.draw_humans(frame, humans, imgcopy=False)
-            human = humans[0]
+            # human = humans[0]
+            human, midX = self.getBestFace(humans)
+
             if (ht.is_hands_above_head(human)):
                 self.logger.debug("HANDS ABOVE HEAD!!!")
-            midX = -1
-            for part in headParts:
-                if part in human.body_parts:
-                    midX = human.body_parts[part].x * VideoStream.DEFAULT_WIDTH
-                    break
+
+
+            # midX = -1
+            # for part in headParts:
+            #     if part in human.body_parts:
+            #         midX = human.body_parts[part].x * VideoStream.DEFAULT_WIDTH
+            #         break
             if midX != -1:
                 centerDiff = abs(midX - VideoStream.DEFAULT_WIDTH/2)
                 if centerDiff > FACE_THRESHOLD:
@@ -285,8 +340,6 @@ class Moment(object):
                 break
 
         self.mc.resetMotors()
-        time.sleep(3)
-        self.mc.stopMotors()
         self.topCamStream.stop()
         self.botCamStream.stop()
         self.mic.close()
