@@ -6,42 +6,51 @@ import matplotlib.pyplot as plt
 import cv2
 
 class map:
-    def __init__(self):
-        self.degrees_per_cell = 90
+    def __init__(self, degrees_per_cell_i):
+        self.degrees_per_cell = degrees_per_cell_i
         self.grid = np.full((int(math.ceil(360.0/self.degrees_per_cell))), 0.5)
 
-        self.p_noise_given_POI = 0.55
-        self.p_noise_given_not_POI = 0.45
+        self.p_noise_given_POI = 0.6
+        self.p_noise_given_not_POI = 0.3
 
-        self.p_no_noise_given_POI = 0.45
-        self.p_no_noise_given_not_POI = 0.55
+        self.p_no_noise_given_POI = 1 - self.p_noise_given_POI
+        self.p_no_noise_given_not_POI = 1 - self.p_noise_given_not_POI
+
+        self.min_percent = 0.1
     #Update map using log odds
     def get_cell_location(self, noise_location):
-        return(int(math.floor(noise_location/self.degrees_per_cell)))
+        cell_loc = int(math.floor(noise_location/self.degrees_per_cell))
+        if cell_loc > self.grid.size:
+            cell_loc = cell_loc%self.grid.size
+        return(cell_loc)
+
     # Get noise location [0,360)
     def update_map_with_noise(self, noise_location):
         # Get noise cell
         noise_cell = self.get_cell_location(noise_location)
-        self.grid[noise_cell] = self.logit_inv(
+        self.grid[noise_cell] = max(self.logit_inv(
                             math.log(self.p_noise_given_POI
                                     /self.p_noise_given_not_POI)
-                            + self.logit(self.grid[noise_cell]))
+                            + self.logit(self.grid[noise_cell])),
+                            self.min_percent)
         no_noise_cells = [no_noise_cell
                             for no_noise_cell in range(self.grid.size)
                             if no_noise_cell not in [noise_cell]]
 
         for no_noise_cell in no_noise_cells:
-            self.grid[no_noise_cell] = self.logit_inv(
+            self.grid[no_noise_cell] = max(self.logit_inv(
                                 math.log(self.p_no_noise_given_POI
                                         /self.p_no_noise_given_not_POI)
-                                + self.logit(self.grid[no_noise_cell]))
+                                + self.logit(self.grid[no_noise_cell])),
+                                self.min_percent)
 
     def update_map_with_no_noise(self):
         for no_noise_cell in range(self.grid.size):
-            self.grid[no_noise_cell] = self.logit_inv(
+            self.grid[no_noise_cell] = max(self.logit_inv(
                                 math.log(self.p_no_noise_given_POI
                                         /self.p_no_noise_given_not_POI)
-                                + self.logit(self.grid[no_noise_cell]))
+                                + self.logit(self.grid[no_noise_cell])),
+                                self.min_percent)
     def update_map_with_person(self, person_location):
         pass
 
@@ -65,14 +74,10 @@ class map:
                 colors = grey_col)
         ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
         plt.draw()
-        plt.pause(0.05)
-        # plt.savefig("foo.png")
-        # img = cv2.imread('foo.png',0)
-        # cv2.imshow('occupancy grid',img)
-        # plt.show() # draw to no suspend
+        plt.pause(0.01)
 
 if __name__ == "__main__":
-    test_map = map()
+    test_map = map(30)
     input_val = input("Enter degree of noise or n for no noise or p for print, x for exit: ")
     while input_val != 'x':
         if input_val == 'n':
@@ -88,20 +93,3 @@ if __name__ == "__main__":
                print(input_val)
         test_map.draw_map()
         input_val = input("Enter degree of noise or n for no noise, x for exit: ")
-
-    # test_map.print_map()
-    # print("Noise at 45")
-    # test_map.update_map_with_noise(45)
-    # test_map.print_map()
-    # print("Noise at 45")
-    # test_map.update_map_with_noise(45)
-    # test_map.print_map()
-    # print("Noise at 95")
-    # test_map.update_map_with_noise(95)
-    # test_map.print_map()
-    # print("Noise at 95")
-    # test_map.update_map_with_noise(95)
-    # test_map.print_map()
-    # print("No noise")
-    # test_map.update_map_with_no_noise()
-    # test_map.print_map()
