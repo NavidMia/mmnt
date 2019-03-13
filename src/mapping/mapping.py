@@ -1,6 +1,10 @@
 import numpy as np
 import math
 
+import matplotlib.pyplot as plt
+
+import cv2
+
 class map:
     def __init__(self):
         self.degrees_per_cell = 90
@@ -51,22 +55,53 @@ class map:
 
     def print_map(self):
         print(self.grid)
+    def draw_map(self):
+        # Pie chart, where the slices will be ordered and plotted counter-clockwise:
+        sizes = np.ones(self.grid.size)
+        grey_col = [str(col) for col in 1 - self.grid]
+        plt.close()
+        fig1, ax1 = plt.subplots()
+        ax1.pie(sizes, autopct=None, startangle=90, counterclock = False,
+                colors = grey_col)
+        ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+        plt.draw()
+        plt.pause(0.05)
+        # plt.savefig("foo.png")
+        # img = cv2.imread('foo.png',0)
+        # cv2.imshow('occupancy grid',img)
+        # plt.show() # draw to no suspend
 
 if __name__ == "__main__":
     test_map = map()
-    test_map.print_map()
-    print("Noise at 45")
-    test_map.update_map_with_noise(45)
-    test_map.print_map()
-    print("Noise at 45")
-    test_map.update_map_with_noise(45)
-    test_map.print_map()
-    print("Noise at 95")
-    test_map.update_map_with_noise(95)
-    test_map.print_map()
-    print("Noise at 95")
-    test_map.update_map_with_noise(95)
-    test_map.print_map()
-    print("No noise")
-    test_map.update_map_with_no_noise()
-    test_map.print_map()
+    input_val = input("Enter degree of noise or n for no noise or p for print, x for exit: ")
+    while input_val != 'x':
+        if input_val == 'n':
+            test_map.update_map_with_no_noise()
+        elif input_val == 'p':
+            test_map.print_map()
+        else:
+            try:
+               val = int(input_val)
+               test_map.update_map_with_noise(val)
+            except ValueError:
+               print("Invalid Input of:")
+               print(input_val)
+        test_map.draw_map()
+        input_val = input("Enter degree of noise or n for no noise, x for exit: ")
+
+    # test_map.print_map()
+    # print("Noise at 45")
+    # test_map.update_map_with_noise(45)
+    # test_map.print_map()
+    # print("Noise at 45")
+    # test_map.update_map_with_noise(45)
+    # test_map.print_map()
+    # print("Noise at 95")
+    # test_map.update_map_with_noise(95)
+    # test_map.print_map()
+    # print("Noise at 95")
+    # test_map.update_map_with_noise(95)
+    # test_map.print_map()
+    # print("No noise")
+    # test_map.update_map_with_no_noise()
+    # test_map.print_map()
