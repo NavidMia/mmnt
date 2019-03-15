@@ -8,6 +8,7 @@ import usb.core
 import usb.util
 import serial
 import logging
+import subprocess
 
 import cv2 as cv
 import numpy as np
@@ -93,6 +94,8 @@ class Moment(object):
         self.logger.debug("Initializing video streams")
         self.topCamStream = VideoStream(1)
         self.botCamStream = VideoStream(2)
+        # self.topCamStream = VideoStream(3)
+        # self.botCamStream = VideoStream(4)
         self.logger.debug("Starting video streams")
         self.topCamStream.start()
         self.botCamStream.start()
@@ -106,6 +109,11 @@ class Moment(object):
         self.botCamAngle = 180
         self.botAngleUpdated = False
         self.master = Cams.TOP
+        self.lastMaster = Cams.TOP
+
+        self.botCamProc = None
+        self.topCamProc = None
+        # self.playVideo(self.master)
 
         self.audioMap = Map(15)
         self.checkMic()
@@ -308,6 +316,16 @@ class Moment(object):
                 self.botCamState &= ~State.HUMAN
         return frame
 
+    def playVideo(self, cam):
+        if cam == Cams.TOP:
+            if self.botCamProc is not None and self.botCamProc.poll() is not None:
+                self.botCamProc.kill()
+            self.topCamProc = subprocess.Popen("ffmpeg -f v4l2 -i /dev/video3 -f v4l2 /dev/video5", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif cam == Cams.BOT:
+            if self.topCamProc is not None and self.topCamProc.poll() is not None:
+                self.topCamProc.kill()
+            self.botCamProc = subprocess.Popen("ffmpeg -f v4l2 -i /dev/video4 -f v4l2 /dev/video5", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     def run(self):
         self.stop = False
         while not self.stop:
@@ -315,8 +333,10 @@ class Moment(object):
                 topFrame = self.topCamStream.read()
                 botFrame = self.botCamStream.read()
                 if time.time() - self.humanSampleTime > HUMAN_SAMPLE_FREQ:
-                    topFrame = self.checkHumans(topFrame, Cams.TOP)
-                    botFrame = self.checkHumans(botFrame, Cams.BOT)
+                    if topFrame is not None:
+                        topFrame = self.checkHumans(topFrame, Cams.TOP)
+                    if botFrame is not None:
+                        botFrame = self.checkHumans(botFrame, Cams.BOT)
                     self.humanSampleTime = time.time()
 
                 if time.time() - self.micSampleTime > MIC_SAMPLE_FREQ:
@@ -325,13 +345,30 @@ class Moment(object):
 
                 self.updatePositions()
 
-                if DISPLAY_VIDEO:
+                if self.lastMaster != self.master:
+                    # self.playVideo(self.master)
+                    self.lastMaster = self.master
+
+                # if DISPLAY_VIDEO and topFrame is not None and botFrame is not None:
+                #     if self.master == Cams.TOP:
+                #         if topFrame is not None:
+                #             cv.imshow('Master', topFrame)
+                #         if botFrame is not None:
+                #             cv.imshow('Slave', botFrame)
+                #     else:
+                #         if botFrame is not None:
+                #             cv.imshow('Master', botFrame)
+                #         if topFrame is not None:
+                #             cv.imshow('Slave', topFrame)
+                #     if cv.waitKey(1) == 27:
+                #         pass
+                if DISPLAY_VIDEO and topFrame is not None and botFrame is not None:
                     if self.master == Cams.TOP:
-                        cv.imshow('Master', topFrame)
-                        cv.imshow('Slave', botFrame)
+                        top_master = np.concatenate((topFrame, botFrame), axis=1)
+                        cv.imshow('Master + Slave', top_master)
                     else:
-                        cv.imshow('Master', botFrame)
-                        cv.imshow('Slave', topFrame)
+                        bot_master = np.concatenate((botFrame, topFrame), axis=1)
+                        cv.imshow('Master + Slave', bot_master)
                     if cv.waitKey(1) == 27:
                         pass
 
