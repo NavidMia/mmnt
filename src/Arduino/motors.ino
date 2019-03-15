@@ -52,7 +52,7 @@ void setup() {
     digitalWrite(msPinBot, HIGH);
     digitalWrite(sleepPin, LOW);
 
-    Serial.begin(9600);
+    Serial.begin(115200);
 }
 
 // serial command for setting motor:
