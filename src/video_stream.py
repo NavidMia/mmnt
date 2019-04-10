@@ -28,16 +28,12 @@ class VideoStream:
                    'videoconvert ! appsink').format(width, height)
         return cv.VideoCapture(gst_str, cv.CAP_GSTREAMER)
 
-    def start(self):
-        Thread(target=self.update, args=()).start()
-
     def update(self):
-        while True:
-            if self.stopped:
-                self.stream.release()
-                return
+        if self.stopped:
+            self.stream.release()
+            return
 
-            (self.grabbed, self.frame) = self.stream.read()
+        (self.grabbed, self.frame) = self.stream.read()
 
     def read(self):
         return self.frame
