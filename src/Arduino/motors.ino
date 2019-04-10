@@ -1,9 +1,9 @@
-int dirPinBot = 3;
-int stepperPinBot = 2;
-int msPinBot = 4;
-int dirPinTop = 7;
-int stepperPinTop = 6;
-int msPinTop = 5;
+int dirPinTop = 3;
+int stepperPinTop = 2;
+int msPinTop = 4;
+int dirPinBot = 7;
+int stepperPinBot = 6;
+int msPinBot = 5;
 int sleepPin = 13;
 
 float stepSize = 1.8/8;
@@ -52,7 +52,7 @@ void setup() {
     digitalWrite(msPinBot, HIGH);
     digitalWrite(sleepPin, LOW);
 
-    Serial.begin(9600);
+    Serial.begin(115200);
 }
 
 // serial command for setting motor:
