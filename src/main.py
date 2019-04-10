@@ -9,6 +9,7 @@ import usb.util
 import serial
 import logging
 import subprocess
+from threading import Thread
 
 import cv2 as cv
 import numpy as np
@@ -23,9 +24,12 @@ from motor_control import MotorControl
 from video_stream import VideoStream
 from mapping.mapping import Map
 
+import os, fcntl
+import v4l2
+
 DEBUG = True
-DISPLAY_VIDEO = True
-DRAW_ON_FRAME = True
+DISPLAY_VIDEO = False
+DRAW_ON_FRAME = False
 
 RESIZE_RATIO = 4.0
 TF_MODEL = "mobilenet_thin" # alternative option: "cmu"
@@ -87,18 +91,14 @@ class Moment(object):
         self.mic.write("STATNOISEONOFF", 1)
         self.mic.write("ECHOONOFF", 1)
 
-        self.logger.debug("Initializing models")
-        self.ht_model = ht.get_model()
-        self.tfPose = TfPoseEstimator(get_graph_path(TF_MODEL), target_size=(VideoStream.DEFAULT_WIDTH, VideoStream.DEFAULT_HEIGHT))
 
         self.logger.debug("Initializing video streams")
         self.topCamStream = VideoStream(1)
         self.botCamStream = VideoStream(2)
-        # self.topCamStream = VideoStream(3)
-        # self.botCamStream = VideoStream(4)
-        self.logger.debug("Starting video streams")
-        self.topCamStream.start()
-        self.botCamStream.start()
+        
+        self.logger.debug("Initializing models")
+        self.ht_model = ht.get_model()
+        self.tfPose = TfPoseEstimator(get_graph_path(TF_MODEL), target_size=(VideoStream.DEFAULT_WIDTH, VideoStream.DEFAULT_HEIGHT))
         self.logger.info("Initialization complete")
 
         self.topCamState = State.IDLE
@@ -113,7 +113,6 @@ class Moment(object):
 
         self.botCamProc = None
         self.topCamProc = None
-        # self.playVideo(self.master)
 
         self.audioMap = Map(15)
         self.checkMic()
@@ -282,18 +281,11 @@ class Moment(object):
 
             if DISPLAY_VIDEO and DRAW_ON_FRAME:
                 TfPoseEstimator.draw_humans(frame, humans, imgcopy=False)
-            # human = humans[0]
             human, midX = self.getBestFace(humans)
 
             if (ht.is_hands_above_head(human)):
                 self.logger.debug("HANDS ABOVE HEAD!!!")
 
-
-            # midX = -1
-            # for part in headParts:
-            #     if part in human.body_parts:
-            #         midX = human.body_parts[part].x * VideoStream.DEFAULT_WIDTH
-            #         break
             if midX != -1:
                 centerDiff = abs(midX - VideoStream.DEFAULT_WIDTH/2)
                 if centerDiff > FACE_THRESHOLD:
@@ -326,6 +318,9 @@ class Moment(object):
                 self.topCamProc.kill()
             self.botCamProc = subprocess.Popen("ffmpeg -f v4l2 -i /dev/video4 -f v4l2 /dev/video5", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+    def start(self):
+        Thread(target=self.run, args=()).start()
+
     def run(self):
         self.stop = False
         while not self.stop:
@@ -344,10 +339,6 @@ class Moment(object):
                     self.micSampleTime = time.time()
 
                 self.updatePositions()
-
-                if self.lastMaster != self.master:
-                    # self.playVideo(self.master)
-                    self.lastMaster = self.master
 
                 # if DISPLAY_VIDEO and topFrame is not None and botFrame is not None:
                 #     if self.master == Cams.TOP:
@@ -377,12 +368,52 @@ class Moment(object):
                 break
 
         self.mc.resetMotors()
-        self.topCamStream.stop()
-        self.botCamStream.stop()
-        self.mic.close()
-        time.sleep(2)
-        cv.destroyAllWindows()
+        # self.topCamStream.stop()
+        # self.botCamStream.stop()
+        # self.mic.close()
+        # time.sleep(2)
+        # cv.destroyAllWindows()
 
 if __name__ == "__main__":
     mmnt = Moment()
-    mmnt.run()
+    mmnt.start()
+    devName = '/dev/video3'
+    if not os.path.exists(devName):
+        print("Warning: device does not exist", devName)
+    device = open(devName, 'wb')
+    mmnt.topCamStream.update()
+    topFrame = mmnt.topCamStream.read()
+    height, width, channels = topFrame.shape
+    #Set up the formatting of our loopback device - boilerplate
+    format                      = v4l2.v4l2_format()
+    format.type                 = v4l2.V4L2_BUF_TYPE_VIDEO_OUTPUT
+    format.fmt.pix.field        = v4l2.V4L2_FIELD_NONE
+    format.fmt.pix.pixelformat  = v4l2.V4L2_PIX_FMT_BGR24
+    format.fmt.pix.width        = width
+    format.fmt.pix.height       = height
+    format.fmt.pix.bytesperline = width * channels
+    format.fmt.pix.sizeimage    = width * height * channels
+
+    print ("set format result (0 is good):{}".format(fcntl.ioctl(device, v4l2.VIDIOC_S_FMT, format)))
+    while True:
+        try:
+            mmnt.topCamStream.update()
+            topFrame = mmnt.topCamStream.read()
+            mmnt.botCamStream.update()
+            botFrame = mmnt.botCamStream.read()
+            if mmnt.master == Cams.TOP:
+                device.write(topFrame)
+            else:
+                device.write(botFrame)
+            concatFrame = np.concatenate((topFrame, botFrame), axis=1)
+            cv.imshow('Top + Bot', concatFrame)
+            if cv.waitKey(1) == 27:
+                pass
+        except KeyboardInterrupt:
+            mmnt.mc.resetMotors()
+            mmnt.topCamStream.stop()
+            mmnt.botCamStream.stop()
+            mmnt.mic.close()
+            cv.destroyAllWindows()
+            break
+    device.close()
