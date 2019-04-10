@@ -38,8 +38,8 @@ class MotorControl(object):
     CCW = "1"
     
     def __init__(self):
-        self.ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1) # Jetson
-        # self.ser = serial.Serial("/dev/tty.usbmodem141201", 9600, timeout=1) # OSX
+        self.ser = serial.Serial("/dev/ttyACM0", 115200, timeout=1) # Jetson
+        # self.ser = serial.Serial("/dev/tty.usbmodem141401", 115200, timeout=1) # OSX
         time.sleep(3)
 
     def build_serial_motor_cmd(self, motor_id, angle):
